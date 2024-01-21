@@ -116,7 +116,7 @@ WITH
                 WHERE t.oid = i.indrelid AND i.indisunique AND i.indnullsnotdistinct AND (i.indpred IS NULL)
                 )
     ),
-    -- no1002 -
+    -- no1002 - no primary key constraint
     check_no1002 AS (
         SELECT
             t.oid AS object_id,
@@ -136,7 +136,7 @@ WITH
             -- not in parent check
             AND NOT ((SELECT enable_check_no1001 FROM conf) AND (t.oid IN (SELECT object_id FROM check_no1001)))
             AND t.relkind IN ('r')
-            -- no constraint PK [test - public.no1001_1]
+            -- no constraint PK
             AND NOT EXISTS (SELECT * FROM pg_catalog.pg_constraint AS c
                 WHERE t.oid = c.conrelid AND t.relnamespace = c.connamespace AND c.contype IN ('p')
                 )

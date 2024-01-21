@@ -1,4 +1,6 @@
-          -- ok - pk
+-- PRIMARY KEY
+-- no1001 - ok
+-- no1002 - ok
 DROP TABLE IF EXISTS public.no1001_1;
 CREATE TABLE public.no1001_1
 (
@@ -7,7 +9,9 @@ CREATE TABLE public.no1001_1
     CONSTRAINT no1001_1_pk PRIMARY KEY (id)
 );
 
--- ok - unique + not null
+-- CONSTRAINT UNIQUE + column NOT NULL
+-- no1001 - ok
+-- no1002 - no
 DROP TABLE IF EXISTS public.no1001_2;
 CREATE TABLE public.no1001_2
 (
@@ -16,8 +20,10 @@ CREATE TABLE public.no1001_2
     CONSTRAINT no1001_2_unique_not_null UNIQUE (id)
 );
 
--- no - unique + nullable column + NULLS DISTINCT
+-- CONSTRAINT UNIQUE + nullable column + NULLS DISTINCT
 -- can create fk, but no unique key
+-- no1001 - no
+-- no1002 - no
 DROP TABLE IF EXISTS public.no1001_3 CASCADE;
 CREATE TABLE public.no1001_3
 (
@@ -43,7 +49,9 @@ CREATE TABLE public.no1001_3_fk
 INSERT INTO public.no1001_3_fk (no1001_3_id, value) VALUES(NULL, '10');
 INSERT INTO public.no1001_3_fk (no1001_3_id, value) VALUES(20, '20');
 
--- ok - unique index, not null
+-- UNIQUE INDEX + column NOT NULL
+-- no1001 - ok
+-- no1002 - no
 DROP TABLE IF EXISTS public.no1001_4;
 CREATE TABLE public.no1001_4
 (
@@ -52,7 +60,9 @@ CREATE TABLE public.no1001_4
 );
 CREATE UNIQUE INDEX no1001_4_ind_unique ON public.no1001_4 (id);
 
--- no - unique index, nullable
+-- UNIQUE INDEX + nullable column + NULLS DISTINCT
+-- no1001 - no
+-- no1002 - no
 DROP TABLE IF EXISTS public.no1001_5;
 CREATE TABLE public.no1001_5
 (
@@ -61,7 +71,9 @@ CREATE TABLE public.no1001_5
 );
 CREATE UNIQUE INDEX no1001_5_ind_unique ON public.no1001_5 (id);
 
--- no - partial unique index, not null
+-- PARTIAL UNIQUE INDEX
+-- no1001 - no
+-- no1002 - no
 DROP TABLE IF EXISTS public.no1001_6;
 CREATE TABLE public.no1001_6
 (
@@ -71,7 +83,9 @@ CREATE TABLE public.no1001_6
 CREATE UNIQUE INDEX no1001_6_ind_unique_partial ON public.no1001_6 (id) WHERE (value = 'value');
 
 
--- yes - unique + nullable column + NULLS NOT DISTINCT
+-- UNIQUE NULLS NOT DISTINCT + nullable column
+-- no1001 - ok
+-- no1002 - no
 DROP TABLE IF EXISTS public.no1001_7;
 CREATE TABLE public.no1001_7
 (
@@ -81,7 +95,9 @@ CREATE TABLE public.no1001_7
 );
 INSERT INTO public.no1001_7 (id, value) VALUES(NULL, '10');
 
--- ok - unique index + nullable column + NULLS NOT DISTINCT
+-- UNIQUE INDEX + nullable column + NULLS NOT DISTINCT
+-- no1001 - ok
+-- no1002 - no
 DROP TABLE IF EXISTS public.no1001_8;
 CREATE TABLE public.no1001_8
 (
