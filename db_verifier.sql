@@ -5,9 +5,10 @@ WITH
     -- configure
     conf AS (
         SELECT
-            'ru' AS conf_language_code,     -- null or value like 'en', 'ru'
+            'ru' AS conf_language_code,     -- null or value like 'en', 'ru' (see check_description)
             true AS enable_check_no1001,    -- check no unique key
-            false AS enable_check_no1002    -- check no primary key constraint
+            true AS enable_check_no1002,    -- check no primary key constraint
+            true AS enable_check_fk1001     -- check fk use mismatched types
     ),
     -- checks based on system catalog info
     check_based_on_system_catalog AS (
@@ -19,7 +20,8 @@ WITH
             'system catalog' AS check_source_name
         FROM (VALUES
             ('no1001', null, 'no unique key', 'error'),
-            ('no1002', 'no1001', 'no primary key constraint', 'error')
+            ('no1002', 'no1001', 'no primary key constraint', 'error'),
+            ('fk1001', null, 'fk use mismatched types', 'error')
         ) AS t(check_code, parent_check_code, check_name, check_level)
     ),
     -- description for checks
@@ -32,7 +34,9 @@ WITH
             ('no1001', null, 'Relation has no unique key.'),
             ('no1001', 'ru', 'У отношения нет уникального ключа (набора полей). Это может создавать проблемы при удалении записей, при логической репликации и др.'),
             ('no1002', null, 'Relation has no primary key constraint.'),
-            ('no1002', 'ru', 'У отношения нет ограничения primary key.')
+            ('no1002', 'ru', 'У отношения нет ограничения primary key.'),
+            ('fk1001', null, 'Foreign key uses columns with mismatched types.'),
+            ('fk1001', 'ru', 'Внешний ключ использует колонки с несовпадающими типами.')
         ) AS t(description_check_code, description_language_code, description_value)
         WHERE
             description_language_code IS NULL
@@ -140,10 +144,93 @@ WITH
             AND NOT EXISTS (SELECT * FROM pg_catalog.pg_constraint AS c
                 WHERE t.oid = c.conrelid AND t.relnamespace = c.connamespace AND c.contype IN ('p')
                 )
+    ),
+    -- filtered FK list (minimal)
+    filtered_fk_list AS (
+        SELECT
+            c.oid,
+            c.conname,
+            c.conrelid,
+            c.confrelid,
+            c.conkey,
+            c.confkey
+        FROM pg_catalog.pg_constraint AS c
+        WHERE
+            c.contype IN ('f')
+            AND c.conrelid IN (SELECT oid FROM filtered_class_list WHERE relkind IN ('r'))
+            AND c.confrelid IN (SELECT oid FROM filtered_class_list WHERE relkind IN ('r'))
+    ),
+    -- filtered FK list with attribute
+    filtered_fk_list_attribute AS (
+        SELECT
+            cfk.oid,
+            cfk.conname,
+            cfk.conrelid,
+            cfk.confrelid,
+            cfk_conkey.conkey_order AS att_order,
+            cfk_conkey.conkey_number,
+            cfk_confkey.confkey_number,
+            rel_att.attname AS rel_att_name,
+            rel_att.atttypid AS rel_att_type_id,
+            rel_att.atttypmod AS rel_att_type_mod,
+            rel_att.attnotnull AS rel_att_notnull,
+            frel_att.attname AS frel_att_name,
+            frel_att.atttypid AS frel_att_type_id,
+            frel_att.atttypmod AS frel_att_type_mod,
+            frel_att.attnotnull AS frel_att_notnull
+        FROM filtered_fk_list AS cfk
+            CROSS JOIN LATERAL UNNEST(cfk.conkey) WITH ORDINALITY AS cfk_conkey(conkey_number, conkey_order)
+            LEFT JOIN LATERAL UNNEST(cfk.confkey) WITH ORDINALITY AS cfk_confkey(confkey_number, confkey_order)
+                ON cfk_conkey.conkey_order = cfk_confkey.confkey_order
+            LEFT JOIN pg_catalog.pg_attribute AS rel_att
+                ON rel_att.attrelid = cfk.conrelid AND rel_att.attnum = cfk_conkey.conkey_number
+            LEFT JOIN pg_catalog.pg_attribute AS frel_att
+                ON frel_att.attrelid = cfk.confrelid AND frel_att.attnum = cfk_confkey.confkey_number
+    ),
+    -- fk1001 - fk use mismatched types
+    check_fk1001 AS (
+        SELECT
+            c.oid AS object_id,
+            c.conname AS object_name,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', c.oid,
+                'object_name', c.conname,
+                'relation_name', t.class_name,
+                'relation_att_names', c.rel_att_names,
+                'foreign_relation_name', tf.class_name,
+                'foreign_relation_att_names', c.frel_att_names,
+                'check', ch.*
+            ) AS check_result_json
+        FROM (
+            SELECT
+                oid,
+                conname,
+                conrelid,
+                confrelid,
+                array_agg (rel_att_name order by att_order ) as rel_att_names,
+                array_agg (frel_att_name order by att_order ) as frel_att_names
+            FROM filtered_fk_list_attribute
+            WHERE
+	            ((rel_att_type_id <> frel_att_type_id) OR (rel_att_type_mod <> frel_att_type_mod))
+            GROUP BY 1, 2, 3, 4
+        ) AS c
+            INNER JOIN filtered_class_list AS t
+                ON t.oid = c.conrelid
+            INNER JOIN filtered_class_list AS tf
+                ON tf.oid = c.confrelid
+            LEFT JOIN check_list ch ON ch.check_code = 'fk1001'
+        WHERE
+            (SELECT enable_check_fk1001 FROM conf)
+            --
     )
 SELECT * FROM (
     SELECT * FROM check_no1001
     UNION ALL
     SELECT * FROM check_no1002
+    UNION ALL
+    SELECT * FROM check_fk1001
 ) AS t
 ORDER BY check_code, object_name;
