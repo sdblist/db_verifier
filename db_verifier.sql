@@ -224,7 +224,7 @@ WITH
                 array_agg (frel_att_name order by att_order ) as frel_att_names
             FROM filtered_fk_list_attribute
             WHERE
-	            ((rel_att_type_id <> frel_att_type_id) OR (rel_att_type_mod <> frel_att_type_mod))
+                ((rel_att_type_id <> frel_att_type_id) OR (rel_att_type_mod <> frel_att_type_mod))
             GROUP BY 1, 2, 3, 4
         ) AS c
             INNER JOIN filtered_class_list AS t
@@ -260,7 +260,8 @@ WITH
                 confrelid,
                 array_agg (rel_att_name order by att_order ) as rel_att_names
             FROM filtered_fk_list_attribute
-            WHERE (NOT rel_att_notnull)
+            WHERE
+                (NOT rel_att_notnull)
             GROUP BY 1, 2, 3, 4
         ) AS c
             INNER JOIN filtered_class_list AS t
