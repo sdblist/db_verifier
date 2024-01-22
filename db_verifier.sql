@@ -1,5 +1,5 @@
 -- minimal PG 15
--- PG 15 - pg_catalog.pg_index.indnullsnotdistinct)
+-- PG 15 - pg_catalog.pg_index.indnullsnotdistinct
 
 WITH
     -- configure
@@ -79,12 +79,14 @@ WITH
         SELECT
             t.oid AS object_id,
             t.class_name AS object_name,
+            'relation' AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', t.oid,
                 'object_name', t.class_name,
+                'object_type', 'relation',
                 'check', ch.*
             ) AS check_result_json
         FROM filtered_class_list AS t
@@ -125,12 +127,14 @@ WITH
         SELECT
             t.oid AS object_id,
             t.class_name AS object_name,
+            'relation' AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', t.oid,
                 'object_name', t.class_name,
+                'object_type', 'relation',
                 'check', ch.*
             ) AS check_result_json
         FROM filtered_class_list AS t
@@ -192,12 +196,14 @@ WITH
         SELECT
             c.oid AS object_id,
             c.conname AS object_name,
+            'constraint' AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', c.oid,
                 'object_name', c.conname,
+                'object_type', 'constraint',
                 'relation_name', t.class_name,
                 'relation_att_names', c.rel_att_names,
                 'foreign_relation_name', tf.class_name,
@@ -227,10 +233,10 @@ WITH
             --
     )
 SELECT * FROM (
-    SELECT * FROM check_no1001
+    SELECT object_id, object_name, object_type, check_code, check_level, check_name, check_result_json FROM check_no1001
     UNION ALL
-    SELECT * FROM check_no1002
+    SELECT object_id, object_name, object_type, check_code, check_level, check_name, check_result_json FROM check_no1002
     UNION ALL
-    SELECT * FROM check_fk1001
+    SELECT object_id, object_name, object_type, check_code, check_level, check_name, check_result_json FROM check_fk1001
 ) AS t
-ORDER BY check_code, object_name;
+ORDER BY check_level, check_code, object_name;
