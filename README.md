@@ -14,7 +14,8 @@ check_code| parent_check_code | check_name                | check_level | descri
 :---------|:------------------|:--------------------------|:------------|:-------------
 no1001    |                   | no unique key             | error       | Relation has no unique key.
 no1002    | no1001            | no primary key constraint | error       | Relation has no primary key constraint.
-fk1001    |                   | fk use mismatched types   | error       | Foreign key uses columns with mismatched types.
+fk1001    |                   | fk uses mismatched types  | error       | Foreign key uses columns with mismatched types.
+fk1002    |                   | fk uses nullable columns  | warning     | Foreign key uses nullable columns.
 
 ## Alternative description
 
