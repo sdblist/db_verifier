@@ -1,7 +1,7 @@
 # db_verifier
 PostgreSQL database verifier.
 
-The current version is applicable to PostgreSQL 15 and older.
+The current version is applicable to PostgreSQL 15 and later. Tested in version PostgreSQL 15.5.
 
 ## Project structure
 
