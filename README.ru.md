@@ -7,7 +7,7 @@
 
 Актуальная версия применима к PostgreSQL 15 и новее. Протестировано в версии PostgreSQL 15.5.
 
-Скрипт с поддержкой нескольких версий PostgreSQL на этапе непубличного тестирования.
+(используется `pg_catalog.pg_index.indnullsnotdistinct`, см.`UNIQUE NULLS NOT DISTINCT` https://postgrespro.ru/docs/postgresql/15/release-15)
 
 ## Структура проекта
 
@@ -16,12 +16,12 @@
 
 ## Перечень проверок
 
-check_code| parent_check_code | check_name                | check_level | description
-:---------|:------------------|:--------------------------|:------------|:-------------
-no1001    |                   | no unique key             | error       | У отношения нет уникального ключа (набора полей). Это может создавать проблемы при удалении записей, при логической репликации и др.
-no1002    | no1001            | no primary key constraint | error       | У отношения нет ограничения primary key.
-fk1001    |                   | fk uses mismatched types  | error       | Внешний ключ использует колонки с несовпадающими типами.
-fk1002    |                   | fk uses nullable columns  | warning     | Внешний ключ использует колонки, допускающие значение NULL.
+ code     | parent_code    | name                      | level     | default state | description
+:---------|:---------------|:--------------------------|:----------|:--------------|:-------------
+no1001    |                | no unique key             | error     | enable        | У отношения нет уникального ключа (набора полей). Это может создавать проблемы при удалении записей, при логической репликации и др.
+no1002    | no1001         | no primary key constraint | error     | enable        | У отношения нет ограничения primary key.                    
+fk1001    |                | fk uses mismatched types  | error     | enable        | Внешний ключ использует колонки с несовпадающими типами.    
+fk1002    |                | fk uses nullable columns  | warning   | disable       | Внешний ключ использует колонки, допускающие значение NULL. 
 
 
 ## Другие описания проекта

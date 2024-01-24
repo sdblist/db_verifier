@@ -5,11 +5,11 @@ WITH
     -- configure
     conf AS (
         SELECT
-            'ru' AS conf_language_code,     -- null or value like 'en', 'ru' (see check_description)
-            true AS enable_check_no1001,    -- check no unique key
-            true AS enable_check_no1002,    -- check no primary key constraint
-            true AS enable_check_fk1001,    -- check fk uses mismatched types
-            true AS enable_check_fk1002     -- check fk uses nullable columns
+            'ru'  AS conf_language_code,     -- null or value like 'en', 'ru' (see check_description)
+            true  AS enable_check_no1001,    -- check no unique key
+            true  AS enable_check_no1002,    -- check no primary key constraint
+            true  AS enable_check_fk1001,    -- check fk uses mismatched types
+            false AS enable_check_fk1002    -- check fk uses nullable columns
     ),
     -- checks based on system catalog info
     check_based_on_system_catalog AS (
