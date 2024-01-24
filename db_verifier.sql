@@ -1,15 +1,14 @@
--- minimal PG 15
--- PG 15 - pg_catalog.pg_index.indnullsnotdistinct
-
+-- PostgreSQL 15 and later
 WITH
     -- configure
     conf AS (
         SELECT
             'ru'  AS conf_language_code,     -- null or value like 'en', 'ru' (see check_description)
-            true  AS enable_check_no1001,    -- check no unique key
-            true  AS enable_check_no1002,    -- check no primary key constraint
-            true  AS enable_check_fk1001,    -- check fk uses mismatched types
-            false AS enable_check_fk1002    -- check fk uses nullable columns
+            true  AS enable_check_no1001,    -- [error] check no unique key
+            true  AS enable_check_no1002,    -- [error] check no primary key constraint
+            true  AS enable_check_fk1001,    -- [error] check fk uses mismatched types
+            false AS enable_check_fk1002,    -- [warning] check fk uses nullable columns
+            false AS enable_check_fk1007     -- [notice] not involved in foreign keys
     ),
     -- checks based on system catalog info
     check_based_on_system_catalog AS (
@@ -23,7 +22,8 @@ WITH
             ('no1001', null, 'no unique key', 'error'),
             ('no1002', 'no1001', 'no primary key constraint', 'error'),
             ('fk1001', null, 'fk uses mismatched types', 'error'),
-            ('fk1002', null, 'fk uses nullable columns', 'warning')
+            ('fk1002', null, 'fk uses nullable columns', 'warning'),
+            ('fk1007', null, 'not involved in foreign keys', 'notice')
         ) AS t(check_code, parent_check_code, check_name, check_level)
     ),
     -- description for checks
@@ -40,7 +40,9 @@ WITH
             ('fk1001', null, 'Foreign key uses columns with mismatched types.'),
             ('fk1001', 'ru', 'Внешний ключ использует колонки с несовпадающими типами.'),
             ('fk1002', null, 'Foreign key uses nullable columns.'),
-            ('fk1002', 'ru', 'Внешний ключ использует колонки, допускающие значение NULL.')
+            ('fk1002', 'ru', 'Внешний ключ использует колонки, допускающие значение NULL.'),
+            ('fk1007', null, 'Relation is not involved in foreign keys.'),
+            ('fk1007', 'ru', 'Отношение не используется во внешних ключах (возможно оно больше не нужно).')
         ) AS t(description_check_code, description_language_code, description_value)
         WHERE
             description_language_code IS NULL
@@ -271,6 +273,29 @@ WITH
             LEFT JOIN check_list ch ON ch.check_code = 'fk1002'
         WHERE
             (SELECT enable_check_fk1002 FROM conf)
+    ),
+    -- fk1007 - not involved in foreign keys
+    check_fk1007 AS (
+        SELECT
+            t.oid AS object_id,
+            t.class_name AS object_name,
+            'relation' AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', t.oid,
+                'object_name', t.class_name,
+                'object_type', 'relation',
+                'check', ch.*
+            ) AS check_result_json
+        FROM filtered_class_list AS t
+            LEFT JOIN check_list ch ON ch.check_code = 'fk1007'
+        WHERE
+            (SELECT enable_check_fk1007 FROM conf)
+            AND relkind IN ('r')
+            AND t.oid NOT IN (SELECT conrelid FROM filtered_fk_list)
+            AND t.oid NOT IN (SELECT confrelid FROM filtered_fk_list)
     )
 SELECT object_id, object_name, object_type, check_code, check_level, check_name, check_result_json FROM (
     SELECT * FROM check_no1001
@@ -280,5 +305,8 @@ SELECT object_id, object_name, object_type, check_code, check_level, check_name,
     SELECT * FROM check_fk1001
     UNION ALL
     SELECT * FROM check_fk1002
+    UNION ALL
+    SELECT * FROM check_fk1007
 ) AS t
-ORDER BY check_level, check_code, object_name;
+ORDER BY check_level, check_code, object_name
+;
