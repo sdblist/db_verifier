@@ -8,7 +8,8 @@ WITH
             true  AS enable_check_no1002,    -- [error] check no primary key constraint
             true  AS enable_check_fk1001,    -- [error] check fk uses mismatched types
             false AS enable_check_fk1002,    -- [warning] check fk uses nullable columns
-            false AS enable_check_fk1007     -- [notice] not involved in foreign keys
+            false AS enable_check_fk1007,    -- [notice] not involved in foreign keys
+            true  AS enable_check_c1001      -- [warning] constraint not validated
     ),
     -- checks based on system catalog info
     check_based_on_system_catalog AS (
@@ -23,7 +24,8 @@ WITH
             ('no1002', 'no1001', 'no primary key constraint', 'error'),
             ('fk1001', null, 'fk uses mismatched types', 'error'),
             ('fk1002', null, 'fk uses nullable columns', 'warning'),
-            ('fk1007', null, 'not involved in foreign keys', 'notice')
+            ('fk1007', null, 'not involved in foreign keys', 'notice'),
+            ('c1001',  null, 'constraint not validated', 'warning')
         ) AS t(check_code, parent_check_code, check_name, check_level)
     ),
     -- description for checks
@@ -42,7 +44,9 @@ WITH
             ('fk1002', null, 'Foreign key uses nullable columns.'),
             ('fk1002', 'ru', 'Внешний ключ использует колонки, допускающие значение NULL.'),
             ('fk1007', null, 'Relation is not involved in foreign keys.'),
-            ('fk1007', 'ru', 'Отношение не используется во внешних ключах (возможно оно больше не нужно).')
+            ('fk1007', 'ru', 'Отношение не используется во внешних ключах (возможно оно больше не нужно).'),
+            ('c1001',  null, 'Constraint was not validated for all data.'),
+            ('c1001',  'ru', 'Ограничение не проверено для всех данных (возможно присутствуют записи, нарушающие ограничение).')
         ) AS t(description_check_code, description_language_code, description_value)
         WHERE
             description_language_code IS NULL
@@ -296,6 +300,45 @@ WITH
             AND relkind IN ('r')
             AND t.oid NOT IN (SELECT conrelid FROM filtered_fk_list)
             AND t.oid NOT IN (SELECT confrelid FROM filtered_fk_list)
+    ),
+    -- filtered constraint list (minimal)
+    filtered_c_list AS (
+        SELECT
+            c.oid,
+            c.contype,
+            c.conname,
+            c.conrelid,
+            c.confrelid,
+            c.conkey,
+            c.confkey,
+            c.convalidated
+        FROM pg_catalog.pg_constraint AS c
+        WHERE
+            c.conrelid IN (SELECT oid FROM filtered_class_list WHERE relkind IN ('r'))
+    ),
+    -- c1001 - constraint not validated
+    check_c1001 AS (
+        SELECT
+            c.oid AS object_id,
+            c.conname AS object_name,
+            'constraint' AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', c.oid,
+                'object_name', c.conname,
+                'object_type', 'constraint',
+                'relation_name', t.class_name,
+                'constraint_type', c.contype,
+                'check', ch.*
+            ) AS check_result_json
+        FROM filtered_c_list AS c
+            INNER JOIN filtered_class_list AS t
+                ON t.oid = c.conrelid AND c.contype IN ('c', 'f') AND (NOT c.convalidated)
+            LEFT JOIN check_list ch ON ch.check_code = 'c1001'
+        WHERE
+            (SELECT enable_check_c1001 FROM conf)
     )
 SELECT object_id, object_name, object_type, check_code, check_level, check_name, check_result_json FROM (
     SELECT * FROM check_no1001
@@ -307,6 +350,8 @@ SELECT object_id, object_name, object_type, check_code, check_level, check_name,
     SELECT * FROM check_fk1002
     UNION ALL
     SELECT * FROM check_fk1007
+    UNION ALL
+    SELECT * FROM check_c1001
 ) AS t
 ORDER BY check_level, check_code, object_name
 ;
