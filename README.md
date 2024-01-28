@@ -20,7 +20,7 @@ fk1001 |             | fk uses mismatched types     | error   | enable        | 
 fk1002 |             | fk uses nullable columns     | warning | disable       | Foreign key uses nullable columns.
 fk1007 |             | not involved in foreign keys | notice  | disable       | Relation is not involved in foreign keys. 
 
-## Пример использования
+## Usage example
 
 An example of using a script to check database metadata using a docker container with PostgreSQL 15.
 
