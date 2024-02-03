@@ -9,7 +9,8 @@ WITH
             true  AS enable_check_fk1001,    -- [error] check fk uses mismatched types
             false AS enable_check_fk1002,    -- [warning] check fk uses nullable columns
             false AS enable_check_fk1007,    -- [notice] not involved in foreign keys
-            true  AS enable_check_c1001      -- [warning] constraint not validated
+            true  AS enable_check_c1001,     -- [warning] constraint not validated
+            true  AS enable_check_i1001      -- [warning] similar indexes
     ),
     -- checks based on system catalog info
     check_based_on_system_catalog AS (
@@ -25,7 +26,8 @@ WITH
             ('fk1001', null, 'fk uses mismatched types', 'error'),
             ('fk1002', null, 'fk uses nullable columns', 'warning'),
             ('fk1007', null, 'not involved in foreign keys', 'notice'),
-            ('c1001',  null, 'constraint not validated', 'warning')
+            ('c1001',  null, 'constraint not validated', 'warning'),
+            ('i1001',  null, 'similar indexes', 'warning')
         ) AS t(check_code, parent_check_code, check_name, check_level)
     ),
     -- description for checks
@@ -46,7 +48,9 @@ WITH
             ('fk1007', null, 'Relation is not involved in foreign keys.'),
             ('fk1007', 'ru', 'Отношение не используется во внешних ключах (возможно оно больше не нужно).'),
             ('c1001',  null, 'Constraint was not validated for all data.'),
-            ('c1001',  'ru', 'Ограничение не проверено для всех данных (возможно присутствуют записи, нарушающие ограничение).')
+            ('c1001',  'ru', 'Ограничение не проверено для всех данных (возможно присутствуют записи, нарушающие ограничение).'),
+            ('i1001',  null, 'Indexes are very similar.'),
+            ('i1001',  'ru', 'Индексы очень похожи (возможно совпадают).')
         ) AS t(description_check_code, description_language_code, description_value)
         WHERE
             description_language_code IS NULL
@@ -339,6 +343,67 @@ WITH
             LEFT JOIN check_list ch ON ch.check_code = 'c1001'
         WHERE
             (SELECT enable_check_c1001 FROM conf)
+    ),
+    -- filtered and extended index list
+    filtered_index_list AS (
+        SELECT
+            ic.oid,
+            ic.class_name,
+            ic.relam,
+            ic.relnatts,
+            i.*,
+            pg_get_indexdef(ic.oid) AS object_definition,
+            -- simplification of definition
+            regexp_replace( -- ' DESC,'
+            regexp_replace( -- ' DESC\)'
+            regexp_replace( -- ' NULLS LAST,'
+            regexp_replace( -- ' NULLS LAST\)'
+            regexp_replace( -- ' NULLS FIRST,'
+            regexp_replace( -- ' NULLS FIRST\)'
+            regexp_replace( -- ' INDEX .* ON '
+            		pg_get_indexdef(ic.oid), ' INDEX .* ON ', ' INDEX ON '),
+            		' NULLS FIRST\)', ')'),
+            		' NULLS FIRST,', ','),
+            		' NULLS LAST\)', ')'),
+            		' NULLS LAST,', ','),
+            		' DESC\)', ')'),
+            		' DESC,', ',')
+            	 AS simplified_object_definition,
+            (SELECT array_agg(c.conname) FROM pg_catalog.pg_constraint AS c WHERE c.conindid = ic.oid)
+                AS used_in_constraint
+        FROM pg_catalog.pg_index AS i
+            INNER JOIN filtered_class_list ic ON i.indexrelid = ic.oid
+    ),
+    -- i1001 - similar indexes
+    check_i1001 AS (
+        SELECT
+            i.oid AS object_id,
+            i.class_name AS object_name,
+            'index' AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', i.oid,
+                'object_name', i.class_name,
+                'object_type', 'index',
+                'relation_name', t.class_name,
+                'similar_index_name', i.class_name,
+                'object_definition', i.object_definition,
+                'simplified_object_definition', i.simplified_object_definition,
+                'similar_index_definition', si.object_definition,
+                'index_used_in_constraint', i.used_in_constraint,
+                'similar_index_used_in_constraint', si.used_in_constraint,
+                'check', ch.*
+            ) AS check_result_json
+        FROM filtered_index_list AS i
+            INNER JOIN filtered_class_list AS t ON i.indrelid = t.oid
+            INNER JOIN filtered_index_list AS si ON i.oid < si.oid AND i.indrelid = si.indrelid AND i.relam = si.relam
+                AND i.relnatts = si.relnatts AND i.indnkeyatts = si.indnkeyatts
+                AND i.simplified_object_definition = si.simplified_object_definition
+            LEFT JOIN check_list ch ON ch.check_code = 'i1001'
+        WHERE
+            (SELECT enable_check_i1001 FROM conf)
     )
 SELECT object_id, object_name, object_type, check_code, check_level, check_name, check_result_json FROM (
     SELECT * FROM check_no1001
@@ -352,6 +417,8 @@ SELECT object_id, object_name, object_type, check_code, check_level, check_name,
     SELECT * FROM check_fk1007
     UNION ALL
     SELECT * FROM check_c1001
+    UNION ALL
+    SELECT * FROM check_i1001
 ) AS t
 ORDER BY check_level, check_code, object_name
 ;

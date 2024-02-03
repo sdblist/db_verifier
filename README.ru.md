@@ -24,6 +24,7 @@ fk1001 |             | fk uses mismatched types     | error   | enable        | 
 fk1002 |             | fk uses nullable columns     | warning | disable       | Внешний ключ использует колонки, допускающие значение NULL.
 fk1007 |             | not involved in foreign keys | notice  | disable       | Отношение не используется во внешних ключах (возможно оно больше не нужно).
 c1001  |             | constraint not validated     | warning | enable        | Ограничение не проверено для всех данных (возможно присутствуют записи, нарушающие ограничение).
+i1001  |             | similar indexes              | warning | enable        | Индексы очень похожи (возможно совпадают).
 
 ## Пример использования
 
