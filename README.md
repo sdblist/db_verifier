@@ -93,6 +93,62 @@ docker stop db_verifier
 docker container remove db_verifier
 ```
 
+## Examples of adaptation and integration into CI
+
+### Switching localization of messages using bash command
+
+Changing the message localization setting to `en`, attribute `conf_language_code`.
+
+```shell
+sed -i "/AS conf_language_code,/c\'en' AS conf_language_code," db_verifier.sql
+```
+
+### Explicitly enable/disable checks using bash command
+
+Explicitly disabling the `i1001` check (similar indexes), the `enable_check_i1001` attribute.
+
+```shell
+sed -i "s/AS enable_check_i1001/AND false AS enable_check_i1001/" db_verifier.sql
+```
+
+```sql
+-- before
+    true AS enable_check_i1001      -- [warning] similar indexes
+-- after
+    true  AND false AS enable_check_i1001      -- [warning] similar indexes
+```
+
+Explicitly enabling the `fk1007` check (not involved in foreign keys), attribute `enable_check_fk1007`.
+
+```shell
+sed -i "s/AS enable_check_fk1007/OR true AS enable_check_fk1007/" db_verifier.sql
+```
+
+```sql
+-- before
+    false AS enable_check_fk1007,    -- [notice] not involved in foreign keys
+-- after
+    false OR true AS enable_check_fk1007,    -- [notice] not involved in foreign keys
+```
+
+### Filtering scan results
+
+Filtering scan results is necessary to exclude false positives or to implement exclusion functionality
+known errors (baseline, error suppression).
+To do this, you can add a `WHERE` condition to the script at the stage of filtering the test results, the point for setting such
+conditions are specified in the comment line `>>> WHERE`.
+
+Example of conditions for filtering results (suppressing some errors).
+
+```shell
+cat examples/where.sql 
+WHERE
+NOT (check_code = 'fk1007' AND object_name = 'public.schema_migrations')
+```
+
+```shell
+sed -i -e "/>>> WHERE/ r where.sql" db_verifier.sql
+```
 
 ## Alternative description
 

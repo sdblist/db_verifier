@@ -95,6 +95,63 @@ docker stop db_verifier
 docker container remove db_verifier
 ```
 
+## Примеры адаптации и интеграции в CI
+
+### Переключение локализации сообщений с помощью bash команды
+
+Изменение настройки локализации сообщений на `en`, атрибут `conf_language_code`.
+
+```shell
+sed -i "/AS conf_language_code,/c\'en' AS conf_language_code," db_verifier.sql
+```
+
+### Явное включение/отключение проверок с помощью bash команды
+
+Явное отключение проверки `i1001` (similar indexes), атрибут `enable_check_i1001`.
+
+```shell
+sed -i "s/AS enable_check_i1001/AND false AS enable_check_i1001/" db_verifier.sql
+```
+
+```sql
+-- до корректировки
+    true AS enable_check_i1001      -- [warning] similar indexes
+-- после корректировки
+    true  AND false AS enable_check_i1001      -- [warning] similar indexes
+```
+
+Явное включение проверки `fk1007` (not involved in foreign keys), атрибут `enable_check_fk1007`.
+
+```shell
+sed -i "s/AS enable_check_fk1007/OR true AS enable_check_fk1007/" db_verifier.sql
+```
+
+```sql
+-- до корректировки
+    false AS enable_check_fk1007,    -- [notice] not involved in foreign keys
+-- после корректировки
+    false OR true AS enable_check_fk1007,    -- [notice] not involved in foreign keys
+```
+
+### Фильтрация результатов проверки
+
+Фильтрация результатов проверки необходима для исключения ложных срабатываний или для реализации функционала исключения 
+известных ошибок (baseline, error suppression).
+Для этого можно добавить в скрипт условие `WHERE` на этапе фильтрации результатов проверки, точка для установки такого 
+условия указана в строке комментария `>>> WHERE`. 
+
+Пример условий для фильтрации результатов (подавления некоторых ошибок).
+
+```shell
+cat examples/where.sql 
+WHERE
+NOT (check_code = 'fk1007' AND object_name = 'public.schema_migrations')
+```
+
+```shell
+sed -i -e "/>>> WHERE/ r where.sql" db_verifier.sql
+```
+
 ## Другие описания проекта
 
 * \[EN] [`README.md`](README.md)

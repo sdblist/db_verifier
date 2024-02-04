@@ -420,5 +420,7 @@ SELECT object_id, object_name, object_type, check_code, check_level, check_name,
     UNION ALL
     SELECT * FROM check_i1001
 ) AS t
+-- result filter (for error suppression)
+-- >>> WHERE
 ORDER BY check_level, check_code, object_name
 ;
