@@ -10,7 +10,8 @@ WITH
             false AS enable_check_fk1002,    -- [warning] check fk uses nullable columns
             false AS enable_check_fk1007,    -- [notice] not involved in foreign keys
             true  AS enable_check_c1001,     -- [warning] constraint not validated
-            true  AS enable_check_i1001      -- [warning] similar indexes
+            true  AS enable_check_i1001,     -- [warning] similar indexes
+            true  AS enable_check_i1002      -- [error] index has bad signs
     ),
     -- checks based on system catalog info
     check_based_on_system_catalog AS (
@@ -27,7 +28,8 @@ WITH
             ('fk1002', null, 'fk uses nullable columns', 'warning'),
             ('fk1007', null, 'not involved in foreign keys', 'notice'),
             ('c1001',  null, 'constraint not validated', 'warning'),
-            ('i1001',  null, 'similar indexes', 'warning')
+            ('i1001',  null, 'similar indexes', 'warning'),
+            ('i1002',  null, 'index has bad signs', 'error')
         ) AS t(check_code, parent_check_code, check_name, check_level)
     ),
     -- description for checks
@@ -50,7 +52,9 @@ WITH
             ('c1001',  null, 'Constraint was not validated for all data.'),
             ('c1001',  'ru', 'Ограничение не проверено для всех данных (возможно присутствуют записи, нарушающие ограничение).'),
             ('i1001',  null, 'Indexes are very similar.'),
-            ('i1001',  'ru', 'Индексы очень похожи (возможно совпадают).')
+            ('i1001',  'ru', 'Индексы очень похожи (возможно совпадают).'),
+            ('i1002',  null, 'Index has bad signs.'),
+            ('i1002',  'ru', 'Индекс имеет признаки проблем.')
         ) AS t(description_check_code, description_language_code, description_value)
         WHERE
             description_language_code IS NULL
@@ -404,21 +408,56 @@ WITH
             LEFT JOIN check_list ch ON ch.check_code = 'i1001'
         WHERE
             (SELECT enable_check_i1001 FROM conf)
+    ),
+    --
+    index_bad_signs AS (
+        SELECT oid, array_agg(value) AS bad_signs FROM (
+            SELECT oid, 'not valid' AS value FROM filtered_index_list WHERE indisvalid IS NOT TRUE
+            UNION ALL
+            SELECT oid, 'not ready' AS value FROM filtered_index_list WHERE indisready IS NOT TRUE
+        ) AS t
+        GROUP BY oid
+    ),
+    -- i1002 - index has bad signs
+    check_i1002 AS (
+        SELECT
+            i.oid AS object_id,
+            i.class_name AS object_name,
+            'index' AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', i.oid,
+                'object_name', i.class_name,
+                'object_type', 'index',
+                'relation_name', t.class_name,
+                'bad_signs', ibs.bad_signs,
+                'check', ch.*
+            ) AS check_result_json
+        FROM filtered_index_list AS i
+            INNER JOIN filtered_class_list AS t ON i.indrelid = t.oid
+            INNER JOIN index_bad_signs AS ibs ON i.oid = ibs.oid
+            LEFT JOIN check_list ch ON ch.check_code = 'i1002'
+        WHERE
+            (SELECT enable_check_i1002 FROM conf)
     )
 SELECT object_id, object_name, object_type, check_code, check_level, check_name, check_result_json FROM (
-    SELECT * FROM check_no1001
+    SELECT * FROM check_no1001 -- no1001 - no unique key
     UNION ALL
-    SELECT * FROM check_no1002
+    SELECT * FROM check_no1002 -- no1002 - no primary key constraint
     UNION ALL
-    SELECT * FROM check_fk1001
+    SELECT * FROM check_fk1001 -- fk1001 - fk uses mismatched types
     UNION ALL
-    SELECT * FROM check_fk1002
+    SELECT * FROM check_fk1002 -- fk1002 - fk uses nullable columns
     UNION ALL
-    SELECT * FROM check_fk1007
+    SELECT * FROM check_fk1007 -- fk1007 - not involved in foreign keys
     UNION ALL
-    SELECT * FROM check_c1001
+    SELECT * FROM check_c1001  -- c1001 - constraint not validated
     UNION ALL
-    SELECT * FROM check_i1001
+    SELECT * FROM check_i1001  -- i1001 - similar indexes
+    UNION ALL
+    SELECT * FROM check_i1002  -- i1002 - index has bad signs
 ) AS t
 -- result filter (for error suppression)
 -- >>> WHERE

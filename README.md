@@ -21,6 +21,7 @@ fk1002 |             | fk uses nullable columns     | warning | disable       | 
 fk1007 |             | not involved in foreign keys | notice  | disable       | Relation is not involved in foreign keys. 
 c1001  |             | constraint not validated     | warning | enable        | Constraint was not validated for all data.
 i1001  |             | similar indexes              | warning | enable        | Indexes are very similar.
+i1002  |             | index has bad signs          | error   | enable        | Index has bad signs.
 
 ## Usage example
 
