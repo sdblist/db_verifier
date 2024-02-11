@@ -12,7 +12,8 @@ WITH
             true  AS enable_check_c1001,     -- [warning] constraint not validated
             true  AS enable_check_i1001,     -- [warning] similar indexes
             true  AS enable_check_i1002,     -- [error] index has bad signs
-            true  AS enable_check_i1003      -- [warning] similar indexes unique and not unique
+            true  AS enable_check_i1003,     -- [warning] similar indexes unique and not unique
+            false AS enable_check_i1005      -- [notice] similar indexes (roughly)
     ),
     -- checks based on system catalog info
     check_based_on_system_catalog AS (
@@ -31,7 +32,8 @@ WITH
             ('c1001',  null, 'constraint not validated', 'warning'),
             ('i1001',  null, 'similar indexes', 'warning'),
             ('i1002',  null, 'index has bad signs', 'error'),
-            ('i1003',  null, 'similar indexes unique and not unique', 'warning')
+            ('i1003',  null, 'similar indexes unique and not unique', 'warning'),
+            ('i1005',  null, 'similar indexes (roughly)', 'notice')
         ) AS t(check_code, parent_check_code, check_name, check_level)
     ),
     -- description for checks
@@ -58,7 +60,9 @@ WITH
             ('i1002',  null, 'Index has bad signs.'),
             ('i1002',  'ru', 'Индекс имеет признаки проблем.'),
             ('i1003',  null, 'Unique and not unique indexes are very similar.'),
-            ('i1003',  'ru', 'Уникальный и не уникальный индексы очень похожи (возможно не уникальный лишний).')
+            ('i1003',  'ru', 'Уникальный и не уникальный индексы очень похожи (возможно не уникальный лишний).'),
+            ('i1005',  null, 'Indexes are roughly similar.'),
+            ('i1005',  'ru', 'Индексы похожи по набору полей (грубое сравнение).')
         ) AS t(description_check_code, description_language_code, description_value)
         WHERE
             description_language_code IS NULL
@@ -477,6 +481,51 @@ WITH
             LEFT JOIN check_list ch ON ch.check_code = 'i1003'
         WHERE
             (SELECT enable_check_i1003 FROM conf)
+    ),
+    -- filtered and extended index list - roughly
+    index_definition_roughly_list AS (
+        SELECT
+            filtered_index_list.*,
+            -- simplification of definition
+            replace(        -- ' UNIQUE '
+            regexp_replace( -- ' INCLUDE'
+            regexp_replace( -- ' WHERE'
+            		simplified_object_definition, ' WHERE .*', ''),
+            		' INCLUDE .*', ''),
+                    ' UNIQUE ', ' ')
+            	 AS simplified_object_definition_roughly
+        FROM filtered_index_list
+    ),
+    -- i1005 - similar indexes (roughly)
+    check_i1005 AS (
+        SELECT
+            i.oid AS object_id,
+            i.class_name AS object_name,
+            'index' AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', i.oid,
+                'object_name', i.class_name,
+                'object_type', 'index',
+                'relation_name', t.class_name,
+                'similar_index_name', si.class_name,
+                'object_definition', i.object_definition,
+                'simplified_object_definition_roughly', i.simplified_object_definition_roughly,
+                'similar_index_definition', si.object_definition,
+                'index_used_in_constraint', i.used_in_constraint,
+                'similar_index_used_in_constraint', si.used_in_constraint,
+                'check', ch.*
+            ) AS check_result_json
+        FROM index_definition_roughly_list AS i
+            INNER JOIN filtered_class_list AS t ON i.indrelid = t.oid
+            INNER JOIN index_definition_roughly_list AS si ON i.oid < si.oid AND i.indrelid = si.indrelid
+                AND i.relam = si.relam
+                AND i.simplified_object_definition_roughly = si.simplified_object_definition_roughly
+            LEFT JOIN check_list ch ON ch.check_code = 'i1005'
+        WHERE
+            (SELECT enable_check_i1005 FROM conf)
     )
 SELECT object_id, object_name, object_type, check_code, check_level, check_name, check_result_json FROM (
     SELECT * FROM check_no1001 -- no1001 - no unique key
@@ -496,6 +545,8 @@ SELECT object_id, object_name, object_type, check_code, check_level, check_name,
     SELECT * FROM check_i1002  -- i1002 - index has bad signs
     UNION ALL
     SELECT * FROM check_i1003  -- i1003 - similar indexes unique and not unique
+    UNION ALL
+    SELECT * FROM check_i1005  -- i1005 - similar indexes (roughly)
 ) AS t
 -- result filter (for error suppression)
 -- >>> WHERE

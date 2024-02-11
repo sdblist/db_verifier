@@ -28,6 +28,7 @@ c1001  |             | constraint not validated              | warning | enable 
 i1001  |             | similar indexes                       | warning | enable        | Indexes are very similar.
 i1002  |             | index has bad signs                   | error   | enable        | Index has bad signs.
 i1003  |             | similar indexes unique and not unique | warning | enable        | Unique and not unique indexes are very similar.
+i1005  |             | similar indexes (roughly)             | notice  | disable       | Indexes are roughly similar.
 
 ## Usage example
 
