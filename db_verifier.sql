@@ -11,7 +11,8 @@ WITH
             false AS enable_check_fk1007,    -- [notice] not involved in foreign keys
             true  AS enable_check_c1001,     -- [warning] constraint not validated
             true  AS enable_check_i1001,     -- [warning] similar indexes
-            true  AS enable_check_i1002      -- [error] index has bad signs
+            true  AS enable_check_i1002,     -- [error] index has bad signs
+            true  AS enable_check_i1003      -- [warning] similar indexes unique and not unique
     ),
     -- checks based on system catalog info
     check_based_on_system_catalog AS (
@@ -29,7 +30,8 @@ WITH
             ('fk1007', null, 'not involved in foreign keys', 'notice'),
             ('c1001',  null, 'constraint not validated', 'warning'),
             ('i1001',  null, 'similar indexes', 'warning'),
-            ('i1002',  null, 'index has bad signs', 'error')
+            ('i1002',  null, 'index has bad signs', 'error'),
+            ('i1003',  null, 'similar indexes unique and not unique', 'warning')
         ) AS t(check_code, parent_check_code, check_name, check_level)
     ),
     -- description for checks
@@ -54,7 +56,9 @@ WITH
             ('i1001',  null, 'Indexes are very similar.'),
             ('i1001',  'ru', 'Индексы очень похожи (возможно совпадают).'),
             ('i1002',  null, 'Index has bad signs.'),
-            ('i1002',  'ru', 'Индекс имеет признаки проблем.')
+            ('i1002',  'ru', 'Индекс имеет признаки проблем.'),
+            ('i1003',  null, 'Unique and not unique indexes are very similar.'),
+            ('i1003',  'ru', 'Уникальный и не уникальный индексы очень похожи (возможно не уникальный лишний).')
         ) AS t(description_check_code, description_language_code, description_value)
         WHERE
             description_language_code IS NULL
@@ -392,7 +396,7 @@ WITH
                 'object_name', i.class_name,
                 'object_type', 'index',
                 'relation_name', t.class_name,
-                'similar_index_name', i.class_name,
+                'similar_index_name', si.class_name,
                 'object_definition', i.object_definition,
                 'simplified_object_definition', i.simplified_object_definition,
                 'similar_index_definition', si.object_definition,
@@ -441,6 +445,38 @@ WITH
             LEFT JOIN check_list ch ON ch.check_code = 'i1002'
         WHERE
             (SELECT enable_check_i1002 FROM conf)
+    ),
+    -- i1003 - similar indexes unique and not unique
+    check_i1003 AS (
+        SELECT
+            ui.oid AS object_id,
+            ui.class_name AS object_name,
+            'index' AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', ui.oid,
+                'object_name', ui.class_name,
+                'object_type', 'index',
+                'relation_name', t.class_name,
+                'similar_index_name', nui.class_name,
+                'object_definition', ui.object_definition,
+                'simplified_object_definition', ui.simplified_object_definition,
+                'similar_index_definition', nui.object_definition,
+                'index_used_in_constraint', ui.used_in_constraint,
+                'similar_index_used_in_constraint', nui.used_in_constraint,
+                'check', ch.*
+            ) AS check_result_json
+        FROM filtered_index_list AS ui
+            INNER JOIN filtered_class_list AS t ON ui.indrelid = t.oid
+            INNER JOIN filtered_index_list AS nui ON ui.indrelid = nui.indrelid AND ui.relam = nui.relam
+                AND ui.indisunique AND NOT nui.indisunique
+                AND ui.relnatts = nui.relnatts AND ui.indnkeyatts = nui.indnkeyatts
+                AND replace(ui.simplified_object_definition, ' UNIQUE ', ' ') = nui.simplified_object_definition
+            LEFT JOIN check_list ch ON ch.check_code = 'i1003'
+        WHERE
+            (SELECT enable_check_i1003 FROM conf)
     )
 SELECT object_id, object_name, object_type, check_code, check_level, check_name, check_result_json FROM (
     SELECT * FROM check_no1001 -- no1001 - no unique key
@@ -458,6 +494,8 @@ SELECT object_id, object_name, object_type, check_code, check_level, check_name,
     SELECT * FROM check_i1001  -- i1001 - similar indexes
     UNION ALL
     SELECT * FROM check_i1002  -- i1002 - index has bad signs
+    UNION ALL
+    SELECT * FROM check_i1003  -- i1003 - similar indexes unique and not unique
 ) AS t
 -- result filter (for error suppression)
 -- >>> WHERE

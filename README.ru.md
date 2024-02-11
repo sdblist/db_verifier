@@ -16,16 +16,17 @@
 
 ## Перечень проверок
 
- code  | parent_code | name                         | level   | default state | description
-:------|:------------|:-----------------------------|:--------|:--------------|:-------------
-no1001 |             | no unique key                | error   | enable        | У отношения нет уникального ключа (набора полей). Это может создавать проблемы при удалении записей, при логической репликации и др.
-no1002 | no1001      | no primary key constraint    | error   | enable        | У отношения нет ограничения primary key.                    
-fk1001 |             | fk uses mismatched types     | error   | enable        | Внешний ключ использует колонки с несовпадающими типами.   
-fk1002 |             | fk uses nullable columns     | warning | disable       | Внешний ключ использует колонки, допускающие значение NULL.
-fk1007 |             | not involved in foreign keys | notice  | disable       | Отношение не используется во внешних ключах (возможно оно больше не нужно).
-c1001  |             | constraint not validated     | warning | enable        | Ограничение не проверено для всех данных (возможно присутствуют записи, нарушающие ограничение).
-i1001  |             | similar indexes              | warning | enable        | Индексы очень похожи (возможно совпадают).
-i1002  |             | index has bad signs          | error   | enable        | Индекс имеет признаки проблем.
+ code  | parent_code | name                                  | level   | default state | description
+:------|:------------|:--------------------------------------|:--------|:--------------|:-------------
+no1001 |             | no unique key                         | error   | enable        | У отношения нет уникального ключа (набора полей). Это может создавать проблемы при удалении записей, при логической репликации и др.
+no1002 | no1001      | no primary key constraint             | error   | enable        | У отношения нет ограничения primary key.                    
+fk1001 |             | fk uses mismatched types              | error   | enable        | Внешний ключ использует колонки с несовпадающими типами.   
+fk1002 |             | fk uses nullable columns              | warning | disable       | Внешний ключ использует колонки, допускающие значение NULL.
+fk1007 |             | not involved in foreign keys          | notice  | disable       | Отношение не используется во внешних ключах (возможно оно больше не нужно).
+c1001  |             | constraint not validated              | warning | enable        | Ограничение не проверено для всех данных (возможно присутствуют записи, нарушающие ограничение).
+i1001  |             | similar indexes                       | warning | enable        | Индексы очень похожи (возможно совпадают).
+i1002  |             | index has bad signs                   | error   | enable        | Индекс имеет признаки проблем.
+i1003  |             | similar indexes unique and not unique | warning | enable        | Уникальный и не уникальный индексы очень похожи (возможно не уникальный лишний).
 
 ## Пример использования
 

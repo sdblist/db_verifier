@@ -17,16 +17,17 @@ The current version is applicable to PostgreSQL 15 and later. Tested in version 
 
 ## Check list
 
- code  | parent_code | name                         | level   | default state | description
-:------|:------------|:-----------------------------|:--------|:--------------|:-------------
-no1001 |             | no unique key                | error   | enable        | Relation has no unique key.
-no1002 | no1001      | no primary key constraint    | error   | enable        | Relation has no primary key constraint.                    
-fk1001 |             | fk uses mismatched types     | error   | enable        | Foreign key uses columns with mismatched types.    
-fk1002 |             | fk uses nullable columns     | warning | disable       | Foreign key uses nullable columns.
-fk1007 |             | not involved in foreign keys | notice  | disable       | Relation is not involved in foreign keys. 
-c1001  |             | constraint not validated     | warning | enable        | Constraint was not validated for all data.
-i1001  |             | similar indexes              | warning | enable        | Indexes are very similar.
-i1002  |             | index has bad signs          | error   | enable        | Index has bad signs.
+ code  | parent_code | name                                  | level   | default state | description
+:------|:------------|:--------------------------------------|:--------|:--------------|:-------------
+no1001 |             | no unique key                         | error   | enable        | Relation has no unique key.
+no1002 | no1001      | no primary key constraint             | error   | enable        | Relation has no primary key constraint.                    
+fk1001 |             | fk uses mismatched types              | error   | enable        | Foreign key uses columns with mismatched types.    
+fk1002 |             | fk uses nullable columns              | warning | disable       | Foreign key uses nullable columns.
+fk1007 |             | not involved in foreign keys          | notice  | disable       | Relation is not involved in foreign keys. 
+c1001  |             | constraint not validated              | warning | enable        | Constraint was not validated for all data.
+i1001  |             | similar indexes                       | warning | enable        | Indexes are very similar.
+i1002  |             | index has bad signs                   | error   | enable        | Index has bad signs.
+i1003  |             | similar indexes unique and not unique | warning | enable        | Unique and not unique indexes are very similar.
 
 ## Usage example
 
