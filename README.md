@@ -1,6 +1,11 @@
 # db_verifier
 PostgreSQL database verifier.
 
+The script to check the database structure for errors or non-recommended practices.
+
+The script consists of a set of checks that access the system catalog tables and do not require access to data in
+user tables.
+
 The current version is applicable to PostgreSQL 15 and later. Tested in version PostgreSQL 15.5.
 
 (used `pg_catalog.pg_index.indnullsnotdistinct`, see `UNIQUE NULLS NOT DISTINCT` https://www.postgresql.org/docs/15/release-15.html)
