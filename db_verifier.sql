@@ -1,4 +1,3 @@
--- PostgreSQL 15 and later
 WITH
     -- configure
     conf AS (
@@ -130,12 +129,6 @@ WITH
                     AND NOT EXISTS (SELECT * FROM pg_catalog.pg_attribute AS a
                         WHERE a.attrelid = c.conrelid AND a.attnum = ANY (c.conkey) AND NOT a.attnotnull)
                 )
-            -- no constraint UNIQUE with NULLS NOT DISTINCT [test - public.no1001_7]
-            AND NOT EXISTS (SELECT * FROM pg_catalog.pg_constraint AS c
-                WHERE t.oid = c.conrelid AND t.relnamespace = c.connamespace AND c.contype IN ('u')
-                    AND EXISTS (SELECT * FROM pg_catalog.pg_index AS i
-                        WHERE i.indexrelid = c.conindid AND i.indnullsnotdistinct)
-                )
             -- unique index with all not nullable columns and not partial [test - public.no1001_4]
             AND NOT EXISTS (SELECT * FROM pg_catalog.pg_index AS i
                 WHERE t.oid = i.indrelid AND i.indisunique AND (i.indpred IS NULL)
@@ -143,10 +136,25 @@ WITH
                         WHERE a.attrelid = i.indrelid AND NOT a.attnotnull
                             AND a.attnum = ANY ((string_to_array(indkey::text, ' ')::int2[])[1:indnkeyatts]))
                 )
-            -- unique index with NULLS NOT DISTINCT and not partial [test - public.no1001_8]
-            AND NOT EXISTS (SELECT * FROM pg_catalog.pg_index AS i
-                WHERE t.oid = i.indrelid AND i.indisunique AND i.indnullsnotdistinct AND (i.indpred IS NULL)
-                )
+            -- UNIQUE NULLS NOT DISTINCT
+            -- (used `pg_catalog.pg_index.indnullsnotdistinct`, see https://www.postgresql.org/docs/15/release-15.html)
+            AND CASE
+                WHEN (SELECT current_setting('server_version_num')::integer < 150000) THEN true
+                ELSE
+                    -- unique index with NULLS NOT DISTINCT and not partial [test - public.no1001_8]
+                    NOT EXISTS (SELECT * FROM pg_catalog.pg_index AS i
+                        WHERE t.oid = i.indrelid AND i.indisunique AND (i.indpred IS NULL)
+                            -- for support PostgreSQL 12..14
+                            AND COALESCE((to_jsonb(i.*) -> 'indnullsnotdistinct')::boolean, false))
+                    -- no constraint UNIQUE with NULLS NOT DISTINCT [test - public.no1001_7]
+                    AND NOT EXISTS (SELECT * FROM pg_catalog.pg_constraint AS c
+                        WHERE t.oid = c.conrelid AND t.relnamespace = c.connamespace AND c.contype IN ('u')
+                            AND EXISTS (SELECT * FROM pg_catalog.pg_index AS i
+                                WHERE i.indexrelid = c.conindid
+                                    -- for support PostgreSQL 12..14
+                                    AND COALESCE((to_jsonb(i.*) -> 'indnullsnotdistinct')::boolean, false))
+                        )
+                END
     ),
     -- no1002 - no primary key constraint
     check_no1002 AS (
