@@ -6,9 +6,7 @@ The script to check the database structure for errors or non-recommended practic
 The script consists of a set of checks that access the system catalog tables and do not require access to data in
 user tables.
 
-The current version is applicable to PostgreSQL 15 and later. Tested in version PostgreSQL 15.5.
-
-(used `pg_catalog.pg_index.indnullsnotdistinct`, see `UNIQUE NULLS NOT DISTINCT` https://www.postgresql.org/docs/15/release-15.html)
+The current version is applicable to PostgreSQL 12 and later. Tested in versions PostgreSQL 15.5.
 
 ## Project structure
 
@@ -17,18 +15,18 @@ The current version is applicable to PostgreSQL 15 and later. Tested in version 
 
 ## Check list
 
- code  | parent_code | name                                  | level   | default state | description
-:------|:------------|:--------------------------------------|:--------|:--------------|:-------------
-no1001 |             | no unique key                         | error   | enable        | Relation has no unique key.
-no1002 | no1001      | no primary key constraint             | error   | enable        | Relation has no primary key constraint.                    
-fk1001 |             | fk uses mismatched types              | error   | enable        | Foreign key uses columns with mismatched types.    
-fk1002 |             | fk uses nullable columns              | warning | disable       | Foreign key uses nullable columns.
-fk1007 |             | not involved in foreign keys          | notice  | disable       | Relation is not involved in foreign keys. 
-c1001  |             | constraint not validated              | warning | enable        | Constraint was not validated for all data.
-i1001  |             | similar indexes                       | warning | enable        | Indexes are very similar.
-i1002  |             | index has bad signs                   | error   | enable        | Index has bad signs.
-i1003  |             | similar indexes unique and not unique | warning | enable        | Unique and not unique indexes are very similar.
-i1005  |             | similar indexes (roughly)             | notice  | disable       | Indexes are roughly similar.
+| code  | parent_code | name                                  | level   | default state | description                                     |
+|:------|:------------|:--------------------------------------|:--------|:--------------|:------------------------------------------------|
+|no1001 |             | no unique key                         | error   | enable        | Relation has no unique key.                     |
+|no1002 | no1001      | no primary key constraint             | error   | enable        | Relation has no primary key constraint.         |                   
+|fk1001 |             | fk uses mismatched types              | error   | enable        | Foreign key uses columns with mismatched types. |   
+|fk1002 |             | fk uses nullable columns              | warning | disable       | Foreign key uses nullable columns.              |
+|fk1007 |             | not involved in foreign keys          | notice  | disable       | Relation is not involved in foreign keys.       |
+|c1001  |             | constraint not validated              | warning | enable        | Constraint was not validated for all data.      |
+|i1001  |             | similar indexes                       | warning | enable        | Indexes are very similar.                       |
+|i1002  |             | index has bad signs                   | error   | enable        | Index has bad signs.                            |
+|i1003  |             | similar indexes unique and not unique | warning | enable        | Unique and not unique indexes are very similar. |
+|i1005  |             | similar indexes (roughly)             | notice  | disable       | Indexes are roughly similar.                    |
 
 ## Usage example
 
@@ -157,6 +155,19 @@ NOT (check_code = 'fk1007' AND object_name = 'public.schema_migrations')
 ```shell
 sed -i -e "/>>> WHERE/ r where.sql" db_verifier.sql
 ```
+
+## Description of the test results table
+
+| column name       | description                                                |
+|:------------------|:-----------------------------------------------------------|
+| object_id         | id (oid) of the object in the corresponding system table   |
+| object_name       | name of the object, in some cases with a schema            |    
+| object_type       | type of object being checked (relation, constraint, index) |  
+| check_code        | check code (see table above)                               |  
+| check_level       | level (see table above)                                    |  
+| check_name        | check name (see table above)                               |  
+| check_result_json | detailed test results in json format                       |  
+ 
 
 ## Alternative description
 
