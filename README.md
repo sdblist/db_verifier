@@ -153,7 +153,35 @@ NOT (check_code = 'fk1007' AND object_name = 'public.schema_migrations')
 ```
 
 ```shell
-sed -i -e "/>>> WHERE/ r where.sql" db_verifier.sql
+sed -i "/>>> WHERE/ r examples/where.sql" db_verifier.sql
+```
+
+### Cumulative score (single value)
+
+An implementation option for obtaining an aggregated score.
+Let's associate each result line with a numeric value based on `check_level`, example in the file
+`examples/cumulative_score.sql`.
+
+```shell
+cat examples/cumulative_score.sql
+SELECT
+    COALESCE(SUM(cumulative_score_value), 0) AS cumulative_score
+FROM (VALUES
+        ('error',   25),
+        ('warning', 12),
+        ('notice',   3)
+    ) AS t(check_level, cumulative_score_value)
+    INNER JOIN (
+-- >>> db_verifier
+) AS r ON t.check_level = r.check_level
+;
+```
+
+Let's combine the scripts, the result in `examples/cumulative_score.sql`.
+
+```shell
+sed -i "/^;$/d" db_verifier.sql
+sed -i "/>>> db_verifier/ r db_verifier.sql" ./examples/cumulative_score.sql
 ```
 
 ## Description of the test results table

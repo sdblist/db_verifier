@@ -150,7 +150,35 @@ NOT (check_code = 'fk1007' AND object_name = 'public.schema_migrations')
 ```
 
 ```shell
-sed -i -e "/>>> WHERE/ r where.sql" db_verifier.sql
+sed -i "/>>> WHERE/ r examples/where.sql" db_verifier.sql
+```
+
+### Кумулятивная оценка (одно значение)
+
+Вариант реализации получения агрегированной оценки одним значением. 
+Сопоставим каждой строке результата числовой значение на основе `check_level`, пример в файле 
+`examples/cumulative_score.sql`.  
+
+```shell
+cat examples/cumulative_score.sql
+SELECT
+    COALESCE(SUM(cumulative_score_value), 0) AS cumulative_score
+FROM (VALUES
+        ('error',   25),
+        ('warning', 12),
+        ('notice',   3)
+    ) AS t(check_level, cumulative_score_value)
+    INNER JOIN (
+-- >>> db_verifier
+) AS r ON t.check_level = r.check_level
+;
+```
+
+Объединим скрипты, результат в `examples/cumulative_score.sql`.
+
+```shell
+sed -i "/^;$/d" db_verifier.sql
+sed -i "/>>> db_verifier/ r db_verifier.sql" ./examples/cumulative_score.sql
 ```
 
 ## Описание таблицы результатов проверки
