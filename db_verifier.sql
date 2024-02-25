@@ -14,26 +14,40 @@ WITH
             true  AS enable_check_i1003,     -- [warning] similar indexes unique and not unique
             false AS enable_check_i1005      -- [notice] similar indexes (roughly)
     ),
+    --
+    check_level_list AS (
+        SELECT
+            check_level
+        FROM
+            (VALUES
+                ('critical'),
+                ('error'),
+                ('warning'),
+                ('notice')
+            ) AS t(check_level)
+    ),
     -- checks based on system catalog info
     check_based_on_system_catalog AS (
         SELECT
-            check_code,
-            parent_check_code,
-            check_name,
-            check_level,
+            t.check_code,
+            t.parent_check_code,
+            t.check_name,
+            t.check_level,
             'system catalog' AS check_source_name
-        FROM (VALUES
-            ('no1001', null, 'no unique key', 'error'),
-            ('no1002', 'no1001', 'no primary key constraint', 'error'),
-            ('fk1001', null, 'fk uses mismatched types', 'error'),
-            ('fk1002', null, 'fk uses nullable columns', 'warning'),
-            ('fk1007', null, 'not involved in foreign keys', 'notice'),
-            ('c1001',  null, 'constraint not validated', 'warning'),
-            ('i1001',  null, 'similar indexes', 'warning'),
-            ('i1002',  null, 'index has bad signs', 'error'),
-            ('i1003',  null, 'similar indexes unique and not unique', 'warning'),
-            ('i1005',  null, 'similar indexes (roughly)', 'notice')
-        ) AS t(check_code, parent_check_code, check_name, check_level)
+        FROM
+            (VALUES
+                ('no1001', null, 'no unique key', 'error'),
+                ('no1002', 'no1001', 'no primary key constraint', 'error'),
+                ('fk1001', null, 'fk uses mismatched types', 'error'),
+                ('fk1002', null, 'fk uses nullable columns', 'warning'),
+                ('fk1007', null, 'not involved in foreign keys', 'notice'),
+                ('c1001',  null, 'constraint not validated', 'warning'),
+                ('i1001',  null, 'similar indexes', 'warning'),
+                ('i1002',  null, 'index has bad signs', 'error'),
+                ('i1003',  null, 'similar indexes unique and not unique', 'warning'),
+                ('i1005',  null, 'similar indexes (roughly)', 'notice')
+            ) AS t(check_code, parent_check_code, check_name, check_level)
+            INNER JOIN check_level_list AS cll ON cll.check_level = t.check_level
     ),
     -- description for checks
     check_description AS (
@@ -41,28 +55,29 @@ WITH
             ROW_NUMBER() OVER (PARTITION BY description_check_code ORDER BY description_language_code ASC NULLS LAST)
                 AS description_check_code_row_num,
             *
-        FROM (VALUES
-            ('no1001', null, 'Relation has no unique key.'),
-            ('no1001', 'ru', 'У отношения нет уникального ключа (набора полей). Это может создавать проблемы при удалении записей, при логической репликации и др.'),
-            ('no1002', null, 'Relation has no primary key constraint.'),
-            ('no1002', 'ru', 'У отношения нет ограничения primary key.'),
-            ('fk1001', null, 'Foreign key uses columns with mismatched types.'),
-            ('fk1001', 'ru', 'Внешний ключ использует колонки с несовпадающими типами.'),
-            ('fk1002', null, 'Foreign key uses nullable columns.'),
-            ('fk1002', 'ru', 'Внешний ключ использует колонки, допускающие значение NULL.'),
-            ('fk1007', null, 'Relation is not involved in foreign keys.'),
-            ('fk1007', 'ru', 'Отношение не используется во внешних ключах (возможно оно больше не нужно).'),
-            ('c1001',  null, 'Constraint was not validated for all data.'),
-            ('c1001',  'ru', 'Ограничение не проверено для всех данных (возможно присутствуют записи, нарушающие ограничение).'),
-            ('i1001',  null, 'Indexes are very similar.'),
-            ('i1001',  'ru', 'Индексы очень похожи (возможно совпадают).'),
-            ('i1002',  null, 'Index has bad signs.'),
-            ('i1002',  'ru', 'Индекс имеет признаки проблем.'),
-            ('i1003',  null, 'Unique and not unique indexes are very similar.'),
-            ('i1003',  'ru', 'Уникальный и не уникальный индексы очень похожи (возможно не уникальный лишний).'),
-            ('i1005',  null, 'Indexes are roughly similar.'),
-            ('i1005',  'ru', 'Индексы похожи по набору полей (грубое сравнение).')
-        ) AS t(description_check_code, description_language_code, description_value)
+        FROM
+            (VALUES
+                ('no1001', null, 'Relation has no unique key.'),
+                ('no1001', 'ru', 'У отношения нет уникального ключа (набора полей). Это может создавать проблемы при удалении записей, при логической репликации и др.'),
+                ('no1002', null, 'Relation has no primary key constraint.'),
+                ('no1002', 'ru', 'У отношения нет ограничения primary key.'),
+                ('fk1001', null, 'Foreign key uses columns with mismatched types.'),
+                ('fk1001', 'ru', 'Внешний ключ использует колонки с несовпадающими типами.'),
+                ('fk1002', null, 'Foreign key uses nullable columns.'),
+                ('fk1002', 'ru', 'Внешний ключ использует колонки, допускающие значение NULL.'),
+                ('fk1007', null, 'Relation is not involved in foreign keys.'),
+                ('fk1007', 'ru', 'Отношение не используется во внешних ключах (возможно оно больше не нужно).'),
+                ('c1001',  null, 'Constraint was not validated for all data.'),
+                ('c1001',  'ru', 'Ограничение не проверено для всех данных (возможно присутствуют записи, нарушающие ограничение).'),
+                ('i1001',  null, 'Indexes are very similar.'),
+                ('i1001',  'ru', 'Индексы очень похожи (возможно совпадают).'),
+                ('i1002',  null, 'Index has bad signs.'),
+                ('i1002',  'ru', 'Индекс имеет признаки проблем.'),
+                ('i1003',  null, 'Unique and not unique indexes are very similar.'),
+                ('i1003',  'ru', 'Уникальный и не уникальный индексы очень похожи (возможно не уникальный лишний).'),
+                ('i1005',  null, 'Indexes are roughly similar.'),
+                ('i1005',  'ru', 'Индексы похожи по набору полей (грубое сравнение).')
+            ) AS t(description_check_code, description_language_code, description_value)
         WHERE
             description_language_code IS NULL
             OR description_language_code IN (SELECT conf_language_code FROM conf)
