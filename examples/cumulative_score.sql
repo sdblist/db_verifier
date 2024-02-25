@@ -1,6 +1,7 @@
 SELECT
     COALESCE(SUM(cumulative_score_value), 0) AS cumulative_score
-FROM (VALUES
+FROM (
+    VALUES
         ('critical', 55),
         ('error',    25),
         ('warning',  12),

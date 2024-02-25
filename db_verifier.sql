@@ -12,7 +12,10 @@ WITH
             true  AS enable_check_i1001,     -- [warning] similar indexes
             true  AS enable_check_i1002,     -- [error] index has bad signs
             true  AS enable_check_i1003,     -- [warning] similar indexes unique and not unique
-            false AS enable_check_i1005      -- [notice] similar indexes (roughly)
+            false AS enable_check_i1005,     -- [notice] similar indexes (roughly)
+            true  AS enable_check_s1010,     -- [critical] less 5% unused sequence values
+            true  AS enable_check_s1011,     -- [error] less 10% unused sequence values
+            true  AS enable_check_s1012      -- [warning] less 20% unused sequence values
     ),
     --
     check_level_list AS (
@@ -36,16 +39,19 @@ WITH
             'system catalog' AS check_source_name
         FROM
             (VALUES
-                ('no1001', null, 'no unique key', 'error'),
+                ('no1001',     null, 'no unique key', 'error'),
                 ('no1002', 'no1001', 'no primary key constraint', 'error'),
-                ('fk1001', null, 'fk uses mismatched types', 'error'),
-                ('fk1002', null, 'fk uses nullable columns', 'warning'),
-                ('fk1007', null, 'not involved in foreign keys', 'notice'),
-                ('c1001',  null, 'constraint not validated', 'warning'),
-                ('i1001',  null, 'similar indexes', 'warning'),
-                ('i1002',  null, 'index has bad signs', 'error'),
-                ('i1003',  null, 'similar indexes unique and not unique', 'warning'),
-                ('i1005',  null, 'similar indexes (roughly)', 'notice')
+                ('fk1001',     null, 'fk uses mismatched types', 'error'),
+                ('fk1002',     null, 'fk uses nullable columns', 'warning'),
+                ('fk1007',     null, 'not involved in foreign keys', 'notice'),
+                ('c1001',      null, 'constraint not validated', 'warning'),
+                ('i1001',      null, 'similar indexes', 'warning'),
+                ('i1002',      null, 'index has bad signs', 'error'),
+                ('i1003',      null, 'similar indexes unique and not unique', 'warning'),
+                ('i1005',      null, 'similar indexes (roughly)', 'notice'),
+                ('s1010',      null, 'less 5% unused sequence values', 'critical'),
+                ('s1011',   's1010', 'less 10% unused sequence values', 'error'),
+                ('s1012',   's1011', 'less 20% unused sequence values', 'warning')
             ) AS t(check_code, parent_check_code, check_name, check_level)
             INNER JOIN check_level_list AS cll ON cll.check_level = t.check_level
     ),
@@ -76,7 +82,13 @@ WITH
                 ('i1003',  null, 'Unique and not unique indexes are very similar.'),
                 ('i1003',  'ru', 'Уникальный и не уникальный индексы очень похожи (возможно не уникальный лишний).'),
                 ('i1005',  null, 'Indexes are roughly similar.'),
-                ('i1005',  'ru', 'Индексы похожи по набору полей (грубое сравнение).')
+                ('i1005',  'ru', 'Индексы похожи по набору полей (грубое сравнение).'),
+                ('s1010',  null, 'The sequence has less than 5% unused values left.'),
+                ('s1010',  'ru', 'У последовательности осталось менее 5% неиспользованных значений.'),
+                ('s1011',  null, 'The sequence has less than 10% unused values left.'),
+                ('s1011',  'ru', 'У последовательности осталось менее 10% неиспользованных значений.'),
+                ('s1012',  null, 'The sequence has less than 20% unused values left.'),
+                ('s1012',  'ru', 'У последовательности осталось менее 20% неиспользованных значений.')
             ) AS t(description_check_code, description_language_code, description_value)
         WHERE
             description_language_code IS NULL
@@ -91,6 +103,7 @@ WITH
         FROM check_based_on_system_catalog
             LEFT JOIN check_description ON check_code = description_check_code AND description_check_code_row_num = 1
     ),
+    --
     excluded_schema_list AS (
         SELECT
             oid AS excluded_schema_oid,
@@ -105,6 +118,7 @@ WITH
                 OR nspname LIKE 'pg_toast%'
             )
     ),
+    --
     filtered_class_list AS (
         SELECT
             c.*,
@@ -549,6 +563,94 @@ WITH
             LEFT JOIN check_list ch ON ch.check_code = 'i1005'
         WHERE
             (SELECT enable_check_i1005 FROM conf)
+    ),
+    --
+    filtered_sequence_list AS (
+        SELECT
+            sc.*,
+            s.*,
+            COALESCE(sv.last_value, s.seqstart) AS last_value,
+            CASE
+                WHEN s.seqincrement > 0 THEN 100.0*(s.seqmax - COALESCE(sv.last_value, s.seqstart))/(s.seqmax - s.seqmin)
+                ELSE 100.0*(COALESCE(sv.last_value, s.seqstart) - s.seqmin)/(s.seqmax - s.seqmin)
+            END::numeric(5, 2) AS unused_values_percent
+        FROM pg_catalog.pg_sequence AS s
+            INNER JOIN filtered_class_list sc ON s.seqrelid = sc.oid
+            LEFT JOIN pg_catalog.pg_sequences sv ON concat(sv.schemaname, '.',  sv.sequencename) = sc.class_name
+    ),
+    -- s1010 less 5% unused sequence values
+    check_s1010 AS (
+        SELECT
+            s.oid AS object_id,
+            s.class_name AS object_name,
+            'sequence' AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', s.oid,
+                'object_name', s.class_name,
+                'object_type', 'sequence',
+                'unused_values_percent', s.unused_values_percent,
+                'check', ch.*
+            ) AS check_result_json
+        FROM filtered_sequence_list AS s
+            LEFT JOIN check_list ch ON ch.check_code = 's1010'
+        WHERE
+            (SELECT enable_check_s1010 FROM conf)
+            AND NOT s.seqcycle
+            AND 5.0 >= s.unused_values_percent
+    ),
+    -- s1011 less 10% unused sequence values
+    check_s1011 AS (
+        SELECT
+            s.oid AS object_id,
+            s.class_name AS object_name,
+            'sequence' AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', s.oid,
+                'object_name', s.class_name,
+                'object_type', 'sequence',
+                'unused_values_percent', s.unused_values_percent,
+                'check', ch.*
+            ) AS check_result_json
+        FROM filtered_sequence_list AS s
+            LEFT JOIN check_list ch ON ch.check_code = 's1011'
+        WHERE
+            (SELECT enable_check_s1011 FROM conf)
+            AND NOT s.seqcycle
+            AND 10.0 >= s.unused_values_percent
+            -- not in parent check
+            AND NOT ((SELECT enable_check_s1010 FROM conf) AND (s.oid IN (SELECT object_id FROM check_s1010)))
+    ),
+    -- s1012 less 20% unused sequence values
+    check_s1012 AS (
+        SELECT
+            s.oid AS object_id,
+            s.class_name AS object_name,
+            'sequence' AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', s.oid,
+                'object_name', s.class_name,
+                'object_type', 'sequence',
+                'unused_values_percent', s.unused_values_percent,
+                'check', ch.*
+            ) AS check_result_json
+        FROM filtered_sequence_list AS s
+            LEFT JOIN check_list ch ON ch.check_code = 's1012'
+        WHERE
+            (SELECT enable_check_s1012 FROM conf)
+            AND NOT s.seqcycle
+            AND 20.0 >= s.unused_values_percent
+            -- not in parent check
+            AND NOT ((SELECT enable_check_s1010 FROM conf) AND (s.oid IN (SELECT object_id FROM check_s1010)))
+            AND NOT ((SELECT enable_check_s1011 FROM conf) AND (s.oid IN (SELECT object_id FROM check_s1011)))
     )
 SELECT object_id, object_name, object_type, check_code, check_level, check_name, check_result_json FROM (
     SELECT * FROM check_no1001 -- no1001 - no unique key
@@ -570,6 +672,12 @@ SELECT object_id, object_name, object_type, check_code, check_level, check_name,
     SELECT * FROM check_i1003  -- i1003 - similar indexes unique and not unique
     UNION ALL
     SELECT * FROM check_i1005  -- i1005 - similar indexes (roughly)
+    UNION ALL
+    SELECT * FROM check_s1010  -- s1010 less 5% unused sequence values
+    UNION ALL
+    SELECT * FROM check_s1011  -- s1011 less 10% unused sequence values
+    UNION ALL
+    SELECT * FROM check_s1012  -- s1012 less 20% unused sequence values
 ) AS t
 -- result filter (for error suppression)
 -- >>> WHERE

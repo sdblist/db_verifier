@@ -15,18 +15,21 @@ The current version is applicable to PostgreSQL 12 and later. Tested in versions
 
 ## Check list
 
-| code  | parent_code | name                                  | level   | default state | description                                     |
-|:------|:------------|:--------------------------------------|:--------|:--------------|:------------------------------------------------|
-|no1001 |             | no unique key                         | error   | enable        | Relation has no unique key.                     |
-|no1002 | no1001      | no primary key constraint             | error   | enable        | Relation has no primary key constraint.         |                   
-|fk1001 |             | fk uses mismatched types              | error   | enable        | Foreign key uses columns with mismatched types. |   
-|fk1002 |             | fk uses nullable columns              | warning | disable       | Foreign key uses nullable columns.              |
-|fk1007 |             | not involved in foreign keys          | notice  | disable       | Relation is not involved in foreign keys.       |
-|c1001  |             | constraint not validated              | warning | enable        | Constraint was not validated for all data.      |
-|i1001  |             | similar indexes                       | warning | enable        | Indexes are very similar.                       |
-|i1002  |             | index has bad signs                   | error   | enable        | Index has bad signs.                            |
-|i1003  |             | similar indexes unique and not unique | warning | enable        | Unique and not unique indexes are very similar. |
-|i1005  |             | similar indexes (roughly)             | notice  | disable       | Indexes are roughly similar.                    |
+| code   | parent_code | name                                  | level    | default state | description                                        |
+|:-------|:------------|:--------------------------------------|:---------|:--------------|:---------------------------------------------------|
+| no1001 |             | no unique key                         | error    | enable        | Relation has no unique key.                        |
+| no1002 | no1001      | no primary key constraint             | error    | enable        | Relation has no primary key constraint.            |                   
+| fk1001 |             | fk uses mismatched types              | error    | enable        | Foreign key uses columns with mismatched types.    |   
+| fk1002 |             | fk uses nullable columns              | warning  | disable       | Foreign key uses nullable columns.                 |
+| fk1007 |             | not involved in foreign keys          | notice   | disable       | Relation is not involved in foreign keys.          |
+| c1001  |             | constraint not validated              | warning  | enable        | Constraint was not validated for all data.         |
+| i1001  |             | similar indexes                       | warning  | enable        | Indexes are very similar.                          |
+| i1002  |             | index has bad signs                   | error    | enable        | Index has bad signs.                               |
+| i1003  |             | similar indexes unique and not unique | warning  | enable        | Unique and not unique indexes are very similar.    |
+| i1005  |             | similar indexes (roughly)             | notice   | disable       | Indexes are roughly similar.                       |
+| s1010  |             | less 5% unused sequence values        | critical | enable        | The sequence has less than 5% unused values left.  |
+| s1011  | s1010       | less 10% unused sequence values       | error    | enable        | The sequence has less than 10% unused values left. |
+| s1012  | s1011       | less 20% unused sequence values       | warning  | enable        | The sequence has less than 20% unused values left. |
 
 ## Usage example
 
@@ -166,10 +169,12 @@ Let's associate each result line with a numeric value based on `check_level`, ex
 cat examples/cumulative_score.sql
 SELECT
     COALESCE(SUM(cumulative_score_value), 0) AS cumulative_score
-FROM (VALUES
-        ('error',   25),
-        ('warning', 12),
-        ('notice',   3)
+FROM (
+    VALUES
+        ('critical', 55),
+        ('error',    25),
+        ('warning',  12),
+        ('notice',    3)
     ) AS t(check_level, cumulative_score_value)
     INNER JOIN (
 -- >>> db_verifier
@@ -186,15 +191,15 @@ sed -i "/>>> db_verifier/ r db_verifier.sql" ./examples/cumulative_score.sql
 
 ## Description of the test results table
 
-| column name       | description                                                |
-|:------------------|:-----------------------------------------------------------|
-| object_id         | id (oid) of the object in the corresponding system table   |
-| object_name       | name of the object, in some cases with a schema            |    
-| object_type       | type of object being checked (relation, constraint, index) |  
-| check_code        | check code (see table above)                               |  
-| check_level       | level (see table above)                                    |  
-| check_name        | check name (see table above)                               |  
-| check_result_json | detailed test results in json format                       |  
+| column name       | description                                                          |
+|:------------------|:---------------------------------------------------------------------|
+| object_id         | id (oid) of the object in the corresponding system table             |
+| object_name       | name of the object, in some cases with a schema                      |    
+| object_type       | type of object being checked (relation, constraint, index, sequence) |  
+| check_code        | check code (see table above)                                         |  
+| check_level       | level (see table above)                                              |  
+| check_name        | check name (see table above)                                         |  
+| check_result_json | detailed test results in json format                                 |  
  
 
 ## Alternative description
