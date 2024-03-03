@@ -2,7 +2,7 @@ WITH
     -- configure
     conf AS (
         SELECT
-            'ru'  AS conf_language_code,     -- null or value like 'en', 'ru' (see check_description)
+            'en'  AS conf_language_code,     -- null or value like 'en', 'ru' (see check_description)
             true  AS enable_check_no1001,    -- [error] check no unique key
             true  AS enable_check_no1002,    -- [error] check no primary key constraint
             true  AS enable_check_fk1001,    -- [error] check fk uses mismatched types

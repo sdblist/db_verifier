@@ -1,0 +1,41 @@
+[tool.poetry]
+name = "db-verifier"
+version = "0.1.0"
+description = "Linter for PostgreSQL DB structure: analysis, verification, optimization."
+authors = ["Vasily Nikonov"]
+readme = "README.md"
+packages = [
+    { include = "db_verifier" },
+    { include = "db_verifier.sql" },
+]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+psycopg = "^3.1.18"
+tabulate = "^0.9.0"
+argparse = "^1.4.0"
+pydantic = "^2.6.3"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.2"
+environs = "^10.3.0"
+pyflakes = "^3.2.0"
+
+[tool.poetry.scripts]
+db_verifier = 'db_verifier.run:run_db_verifier'
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+
+# https://black.readthedocs.io/en/stable/pyproject_toml.html
+[tool.black]
+required-version = "23.3.0"
+target-version = ["py38"]
+line-length = 120
+
+[tool.isort]
+profile = "black"
+

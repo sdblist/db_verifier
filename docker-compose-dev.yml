@@ -1,0 +1,15 @@
+version: "3.4"
+services:
+  postgresql:
+    container_name: db_verifier_postgres
+    image: postgres:15
+    volumes:
+        - "data:/var/lib/postgresql/data"
+    env_file:
+        - dev_env/postgres.env
+    ports:
+        - "0.0.0.0:5434:5432"
+    expose:
+        - "5432"
+volumes:
+  data:

@@ -205,3 +205,152 @@ sed -i "/>>> db_verifier/ r db_verifier.sql" ./examples/cumulative_score.sql
 ## Alternative description
 
 * \[RU] [`README.ru.md`](README.ru.md)
+
+## Python Wrapper
+There is a Python wrapper implemented for the SQL checks in this project.
+It allows running the DB verifier as a standalone command or as a part of the automated testing process.
+
+Until it is not published to PyPi, please build from sources and install as a wheel package.
+The following instructions will be replaced with simply: `pip install db_verifier` after publishing.
+
+### Building Python wrapper with Poetry
+
+The following instructions are tested on Ubuntu 20.04.
+
+Please adapt to your development environment accordingly. 
+
+The project is built with Poetry (https://python-poetry.org/docs/pyproject/).
+To install Poetry use the instructions on its site:
+https://python-poetry.org/docs/#installing-with-the-official-installer
+
+This is a possible one-line installation using their official installation script:
+```shell
+curl -sSL https://install.python-poetry.org | python3 -
+```
+
+Initializing and building the project:
+```shell
+cd db_verifier
+poetry init
+poetry build
+```
+
+As a result it will create a distribution package in db_verifier/dist dir.
+
+## Install DB Verifier Command
+
+You can install DB Verifier python wrapper into your Python virtual environment or any other way you prefer.
+
+Installing from PyPi (not published yet):
+```shell
+pip install db_verifier
+```
+
+Installing from pre-built wheel package:
+```shell
+pip install db_verifier/dist/db_verifier-0.1.0-py3-none-any.whl
+```
+
+After the package is installed you can use db_verifier command.
+
+## Using as a standalone command
+
+```shell
+PGUSER=user PGPASSWORD=pass db_verifier --connection=postgresql://my_host:5432/my_db
+```
+By default, it prints the report in human-readable text format to stdout and exits with the following OS error codes:
+- 0: no errors detected (can be configured to fail on warnings also);
+- 1: errors detected;
+- 2: connection problem or any other error unrelated to the problems in the DB structure.
+
+Verify DB and print report in CSV to stdout:
+```shell
+PGUSER=user PGPASSWORD=pass db_verifier --connection=postgresql://my_host:5432/my_db --format=csv
+```
+
+Verify DB and print report in JSON-lines stdout (each line is a JSON object):
+```shell
+PGUSER=user PGPASSWORD=pass db_verifier --connection=postgresql://my_host:5432/my_db --format=json
+```
+
+## Using in Python unit tests
+
+Here is an example of how DB Verifier can be integrated into a Django automated testing pipeline.
+
+Django has a built-in ability to generate a test database based on the configured models and migrations and 
+use it for the tests.
+
+DB Verifier can be included as one of the tests.
+
+For example in a Django project with pytest tests the following works good:
+```python
+import pytest
+from db_verifier import verify_and_print_txt
+from django.db import connection
+
+
+@pytest.mark.django_db(transaction=True)
+def test_db_structure():
+    verify_and_print_txt(connection, fail_on_warnings=True)
+```
+
+The test is marked with "django_db". \
+This means an empty test DB will be initialized based on the 
+Django ORM configuration. \
+Next "verify_and_print_txt" is used on the Django's connection (psycopg Connection object). \
+This function runs the SQL checks and prints error to stdout in human-readable form similar to how linters and
+other common utilities do. \
+In the end it raises an exception if there were errors/warnings found, and it will be a failed test in the logs.
+
+This way it can be included into a CI process of a typical Django project.
+
+It can be used the similar way to integrate with other types of Python projects.
+
+# Setting-up dev environment for Python wrapper
+
+See above - building the project with Poetry.
+
+The project was developed with the following scheme:
+- dependencies are to be started in docker;
+- python code is started on the host machine in a virtualenv managed by Poetry.
+
+To initialize the project:
+```shell
+git clone ...
+cd db_verifier
+poetry init
+```
+
+Copy `.env.default` to `.env` and change the dev config if needed.\
+
+
+To activate virtualenv:
+```shell
+poetry shell
+```
+
+To run the tests:
+
+Start dependencies in docker in one terminal session:
+```shell
+poetry shell
+make start_deps
+```
+
+Run the tests in IDE or in the 2nd terminal session:
+```shell
+poetry shell
+make run_tests
+```
+
+Auto-format code:
+```
+poetry shell
+make black
+```
+
+Check code-style:
+```
+poetry shell
+make check_lint
+```
