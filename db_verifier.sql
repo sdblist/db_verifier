@@ -13,6 +13,7 @@ WITH
             true  AS enable_check_i1002,     -- [error] index has bad signs
             true  AS enable_check_i1003,     -- [warning] similar indexes unique and not unique
             false AS enable_check_i1005,     -- [notice] similar indexes (roughly)
+            true  AS enable_check_i1010,     -- [notice] b-tree index for array column
             true  AS enable_check_s1010,     -- [critical] less 5% unused sequence values
             true  AS enable_check_s1011,     -- [error] less 10% unused sequence values
             true  AS enable_check_s1012      -- [warning] less 20% unused sequence values
@@ -29,6 +30,18 @@ WITH
                 ('notice')
             ) AS t(check_level)
     ),
+    --
+    object_type_list AS (
+        SELECT
+            object_type
+        FROM
+            (VALUES
+                ('constraint'),
+                ('index'),
+                ('relation'),
+                ('sequence')
+            ) AS t(object_type)
+    ),
     -- checks based on system catalog info
     check_based_on_system_catalog AS (
         SELECT
@@ -36,24 +49,27 @@ WITH
             t.parent_check_code,
             t.check_name,
             t.check_level,
+            t.object_type,
             'system catalog' AS check_source_name
         FROM
             (VALUES
-                ('no1001',     null, 'no unique key', 'error'),
-                ('no1002', 'no1001', 'no primary key constraint', 'error'),
-                ('fk1001',     null, 'fk uses mismatched types', 'error'),
-                ('fk1002',     null, 'fk uses nullable columns', 'warning'),
-                ('fk1007',     null, 'not involved in foreign keys', 'notice'),
-                ('c1001',      null, 'constraint not validated', 'warning'),
-                ('i1001',      null, 'similar indexes', 'warning'),
-                ('i1002',      null, 'index has bad signs', 'error'),
-                ('i1003',      null, 'similar indexes unique and not unique', 'warning'),
-                ('i1005',      null, 'similar indexes (roughly)', 'notice'),
-                ('s1010',      null, 'less 5% unused sequence values', 'critical'),
-                ('s1011',   's1010', 'less 10% unused sequence values', 'error'),
-                ('s1012',   's1011', 'less 20% unused sequence values', 'warning')
-            ) AS t(check_code, parent_check_code, check_name, check_level)
+                ('no1001',     null, 'no unique key', 'error', 'relation'),
+                ('no1002', 'no1001', 'no primary key constraint', 'error', 'relation'),
+                ('fk1001',     null, 'fk uses mismatched types', 'error', 'constraint'),
+                ('fk1002',     null, 'fk uses nullable columns', 'warning', 'constraint'),
+                ('fk1007',     null, 'not involved in foreign keys', 'notice', 'relation'),
+                ('c1001',      null, 'constraint not validated', 'warning', 'constraint'),
+                ('i1001',      null, 'similar indexes', 'warning', 'index'),
+                ('i1002',      null, 'index has bad signs', 'error', 'index'),
+                ('i1003',      null, 'similar indexes unique and not unique', 'warning', 'index'),
+                ('i1005',      null, 'similar indexes (roughly)', 'notice', 'index'),
+                ('i1010',      null, 'b-tree index for array column', 'notice', 'index'),
+                ('s1010',      null, 'less 5% unused sequence values', 'critical', 'sequence'),
+                ('s1011',   's1010', 'less 10% unused sequence values', 'error', 'sequence'),
+                ('s1012',   's1011', 'less 20% unused sequence values', 'warning', 'sequence')
+            ) AS t(check_code, parent_check_code, check_name, check_level, object_type)
             INNER JOIN check_level_list AS cll ON cll.check_level = t.check_level
+            INNER JOIN object_type_list AS otl ON otl.object_type = t.object_type
     ),
     -- description for checks
     check_description AS (
@@ -83,6 +99,8 @@ WITH
                 ('i1003',  'ru', 'Уникальный и не уникальный индексы очень похожи (возможно не уникальный лишний).'),
                 ('i1005',  null, 'Indexes are roughly similar.'),
                 ('i1005',  'ru', 'Индексы похожи по набору полей (грубое сравнение).'),
+                ('i1010',  null, 'B-tree index for array column.'),
+                ('i1010',  'ru', 'B-tree индекс на поле с массивом значений, не индексирует элементы массива (возможно нужен GIN индекс).'),
                 ('s1010',  null, 'The sequence has less than 5% unused values left.'),
                 ('s1010',  'ru', 'У последовательности осталось менее 5% неиспользованных значений.'),
                 ('s1011',  null, 'The sequence has less than 10% unused values left.'),
@@ -133,14 +151,14 @@ WITH
         SELECT
             t.oid AS object_id,
             t.class_name AS object_name,
-            'relation' AS object_type,
+            ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', t.oid,
                 'object_name', t.class_name,
-                'object_type', 'relation',
+                'object_type', ch.object_type,
                 'check', ch.*
             ) AS check_result_json
         FROM filtered_class_list AS t
@@ -190,14 +208,14 @@ WITH
         SELECT
             t.oid AS object_id,
             t.class_name AS object_name,
-            'relation' AS object_type,
+            ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', t.oid,
                 'object_name', t.class_name,
-                'object_type', 'relation',
+                'object_type', ch.object_type,
                 'check', ch.*
             ) AS check_result_json
         FROM filtered_class_list AS t
@@ -259,14 +277,14 @@ WITH
         SELECT
             c.oid AS object_id,
             c.conname AS object_name,
-            'constraint' AS object_type,
+            ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', c.oid,
                 'object_name', c.conname,
-                'object_type', 'constraint',
+                'object_type', ch.object_type,
                 'relation_name', t.class_name,
                 'relation_att_names', c.rel_att_names,
                 'foreign_relation_name', tf.class_name,
@@ -299,14 +317,14 @@ WITH
         SELECT
             c.oid AS object_id,
             c.conname AS object_name,
-            'constraint' AS object_type,
+            ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', c.oid,
                 'object_name', c.conname,
-                'object_type', 'constraint',
+                'object_type', ch.object_type,
                 'relation_name', t.class_name,
                 'relation_att_names', c.rel_att_names,
                 'check', ch.*
@@ -336,14 +354,14 @@ WITH
         SELECT
             t.oid AS object_id,
             t.class_name AS object_name,
-            'relation' AS object_type,
+            ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', t.oid,
                 'object_name', t.class_name,
-                'object_type', 'relation',
+                'object_type', ch.object_type,
                 'check', ch.*
             ) AS check_result_json
         FROM filtered_class_list AS t
@@ -374,14 +392,14 @@ WITH
         SELECT
             c.oid AS object_id,
             c.conname AS object_name,
-            'constraint' AS object_type,
+            ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', c.oid,
                 'object_name', c.conname,
-                'object_type', 'constraint',
+                'object_type', ch.object_type,
                 'relation_name', t.class_name,
                 'constraint_type', c.contype,
                 'check', ch.*
@@ -428,14 +446,14 @@ WITH
         SELECT
             i.oid AS object_id,
             i.class_name AS object_name,
-            'index' AS object_type,
+            ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', i.oid,
                 'object_name', i.class_name,
-                'object_type', 'index',
+                'object_type', ch.object_type,
                 'relation_name', t.class_name,
                 'similar_index_name', si.class_name,
                 'object_definition', i.object_definition,
@@ -468,14 +486,14 @@ WITH
         SELECT
             i.oid AS object_id,
             i.class_name AS object_name,
-            'index' AS object_type,
+            ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', i.oid,
                 'object_name', i.class_name,
-                'object_type', 'index',
+                'object_type', ch.object_type,
                 'relation_name', t.class_name,
                 'bad_signs', ibs.bad_signs,
                 'check', ch.*
@@ -492,14 +510,14 @@ WITH
         SELECT
             ui.oid AS object_id,
             ui.class_name AS object_name,
-            'index' AS object_type,
+            ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', ui.oid,
                 'object_name', ui.class_name,
-                'object_type', 'index',
+                'object_type', ch.object_type,
                 'relation_name', t.class_name,
                 'similar_index_name', nui.class_name,
                 'object_definition', ui.object_definition,
@@ -538,14 +556,14 @@ WITH
         SELECT
             i.oid AS object_id,
             i.class_name AS object_name,
-            'index' AS object_type,
+            ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', i.oid,
                 'object_name', i.class_name,
-                'object_type', 'index',
+                'object_type', ch.object_type,
                 'relation_name', t.class_name,
                 'similar_index_name', si.class_name,
                 'object_definition', i.object_definition,
@@ -563,6 +581,34 @@ WITH
             LEFT JOIN check_list ch ON ch.check_code = 'i1005'
         WHERE
             (SELECT enable_check_i1005 FROM conf)
+    ),
+    -- i1010 - b-tree index for array column
+    check_i1010 AS (
+        SELECT
+            i.oid AS object_id,
+            i.class_name AS object_name,
+            ch.object_type AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', i.oid,
+                'object_name', i.class_name,
+                'object_type', ch.object_type,
+                'relation_name', t.class_name,
+                'check', ch.*
+            ) AS check_result_json
+        FROM filtered_index_list AS i
+            INNER JOIN filtered_class_list AS t ON i.indrelid = t.oid
+            INNER JOIN pg_catalog.pg_am AS a ON i.relam = a.oid AND a.amname = 'btree'
+            LEFT JOIN check_list ch ON ch.check_code = 'i1010'
+        WHERE
+            (SELECT enable_check_i1010 FROM conf)
+            AND EXISTS (SELECT * FROM pg_catalog.pg_attribute AS att
+                        INNER JOIN pg_catalog.pg_type AS typ ON typ.oid = att.atttypid
+                        WHERE att.attrelid = i.indrelid
+                            AND att.attnum = ANY ((string_to_array(indkey::text, ' ')::int2[])[1:indnkeyatts])
+                            AND typ.typcategory = 'A')
     ),
     --
     filtered_sequence_list AS (
@@ -583,14 +629,14 @@ WITH
         SELECT
             s.oid AS object_id,
             s.class_name AS object_name,
-            'sequence' AS object_type,
+            ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', s.oid,
                 'object_name', s.class_name,
-                'object_type', 'sequence',
+                'object_type', ch.object_type,
                 'unused_values_percent', s.unused_values_percent,
                 'check', ch.*
             ) AS check_result_json
@@ -606,14 +652,14 @@ WITH
         SELECT
             s.oid AS object_id,
             s.class_name AS object_name,
-            'sequence' AS object_type,
+            ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', s.oid,
                 'object_name', s.class_name,
-                'object_type', 'sequence',
+                'object_type', ch.object_type,
                 'unused_values_percent', s.unused_values_percent,
                 'check', ch.*
             ) AS check_result_json
@@ -631,14 +677,14 @@ WITH
         SELECT
             s.oid AS object_id,
             s.class_name AS object_name,
-            'sequence' AS object_type,
+            ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', s.oid,
                 'object_name', s.class_name,
-                'object_type', 'sequence',
+                'object_type', ch.object_type,
                 'unused_values_percent', s.unused_values_percent,
                 'check', ch.*
             ) AS check_result_json
@@ -672,6 +718,8 @@ SELECT object_id, object_name, object_type, check_code, check_level, check_name,
     SELECT * FROM check_i1003  -- i1003 - similar indexes unique and not unique
     UNION ALL
     SELECT * FROM check_i1005  -- i1005 - similar indexes (roughly)
+    UNION ALL
+    SELECT * FROM check_i1010  -- i1010 - b-tree index for array column
     UNION ALL
     SELECT * FROM check_s1010  -- s1010 less 5% unused sequence values
     UNION ALL

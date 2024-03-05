@@ -27,6 +27,7 @@ The current version is applicable to PostgreSQL 12 and later. Tested in versions
 | i1002  |             | index has bad signs                   | error    | enable        | Index has bad signs.                               |
 | i1003  |             | similar indexes unique and not unique | warning  | enable        | Unique and not unique indexes are very similar.    |
 | i1005  |             | similar indexes (roughly)             | notice   | disable       | Indexes are roughly similar.                       |
+| i1010  |             | b-tree index for array column         | notice   | enable        | B-tree index for array column.                     |
 | s1010  |             | less 5% unused sequence values        | critical | enable        | The sequence has less than 5% unused values left.  |
 | s1011  | s1010       | less 10% unused sequence values       | error    | enable        | The sequence has less than 10% unused values left. |
 | s1012  | s1011       | less 20% unused sequence values       | warning  | enable        | The sequence has less than 20% unused values left. |
