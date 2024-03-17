@@ -32,6 +32,7 @@
 | s1012  | s1011       | less 20% unused sequence values          | warning  | enable        | У последовательности осталось менее 20% неиспользованных значений.                                                                   |
 | n1001  |             | confusion in name of schemas             | warning  | enable        | Возможна путаница в наименованиях схем. Наименования опасно похожи.                                                                  |
 | n1005  |             | confusion in name of relation attributes | warning  | enable        | Возможна путаница в наименованиях атрибутов отношения (колонок). Наименования опасно похожи.                                         |
+| n1010  |             | confusion in name of relations           | warning  | enable        | Возможна путаница в наименованиях отношений в одной схеме. Наименования опасно похожи.                                               |
 
 
 

@@ -18,7 +18,8 @@ WITH
             true  AS enable_check_s1011,     -- [error] less 10% unused sequence values
             true  AS enable_check_s1012,     -- [warning] less 20% unused sequence values
             true  AS enable_check_n1001,     -- [warning] confusion in name of schemas
-            true  AS enable_check_n1005      -- [warning] confusion in name of relation attributes
+            true  AS enable_check_n1005,     -- [warning] confusion in name of relation attributes
+            true  AS enable_check_n1010      -- [warning] confusion in name of relations
     ),
     --
     check_level_list AS (
@@ -72,7 +73,8 @@ WITH
                 ('s1011',   's1010', 'less 10% unused sequence values', 'error', 'sequence'),
                 ('s1012',   's1011', 'less 20% unused sequence values', 'warning', 'sequence'),
                 ('n1001',      null, 'confusion in name of schemas', 'warning', 'schema'),
-                ('n1005',      null, 'confusion in name of relation attributes', 'warning', 'attribute')
+                ('n1005',      null, 'confusion in name of relation attributes', 'warning', 'attribute'),
+                ('n1010',      null, 'confusion in name of relations', 'warning', 'relation')
             ) AS t(check_code, parent_check_code, check_name, check_level, object_type)
             INNER JOIN check_level_list AS cll ON cll.check_level = t.check_level
             INNER JOIN object_type_list AS otl ON otl.object_type = t.object_type
@@ -82,7 +84,7 @@ WITH
         SELECT
             ROW_NUMBER() OVER (PARTITION BY description_check_code ORDER BY description_language_code ASC NULLS LAST)
                 AS description_check_code_row_num,
-            *
+            t.*
         FROM
             (VALUES
                 ('no1001', null, 'Relation has no unique key.'),
@@ -116,7 +118,9 @@ WITH
                 ('n1001',  null, 'There may be confusion in the name of the schemas. The names are dangerously similar.'),
                 ('n1001',  'ru', 'Возможна путаница в наименованиях схем. Наименования опасно похожи.'),
                 ('n1005',  null, 'There may be confusion in the name of the relation attributes. The names are dangerously similar.'),
-                ('n1005',  'ru', 'Возможна путаница в наименованиях атрибутов отношения (колонок). Наименования опасно похожи.')
+                ('n1005',  'ru', 'Возможна путаница в наименованиях атрибутов отношения (колонок). Наименования опасно похожи.'),
+                ('n1010',  null, 'There may be confusion in the name of the relations in the same schema. The names are dangerously similar.'),
+                ('n1010',  'ru', 'Возможна путаница в наименованиях отношений в одной схеме. Наименования опасно похожи.')
             ) AS t(description_check_code, description_language_code, description_value)
         WHERE
             description_language_code IS NULL
@@ -166,14 +170,14 @@ WITH
     check_no1001 AS (
         SELECT
             t.oid AS object_id,
-            t.class_name AS object_name,
+            t.formatted_class_name AS object_name,
             ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', t.oid,
-                'object_name', t.class_name,
+                'object_name', t.formatted_class_name,
                 'object_type', ch.object_type,
                 'check', ch.*
             ) AS check_result_json
@@ -223,14 +227,14 @@ WITH
     check_no1002 AS (
         SELECT
             t.oid AS object_id,
-            t.class_name AS object_name,
+            t.formatted_class_name AS object_name,
             ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', t.oid,
-                'object_name', t.class_name,
+                'object_name', t.formatted_class_name,
                 'object_type', ch.object_type,
                 'check', ch.*
             ) AS check_result_json
@@ -301,9 +305,9 @@ WITH
                 'object_id', c.oid,
                 'object_name', c.conname,
                 'object_type', ch.object_type,
-                'relation_name', t.class_name,
+                'relation_name', t.formatted_class_name,
                 'relation_att_names', c.rel_att_names,
-                'foreign_relation_name', tf.class_name,
+                'foreign_relation_name', tf.formatted_class_name,
                 'foreign_relation_att_names', c.frel_att_names,
                 'check', ch.*
             ) AS check_result_json
@@ -341,7 +345,7 @@ WITH
                 'object_id', c.oid,
                 'object_name', c.conname,
                 'object_type', ch.object_type,
-                'relation_name', t.class_name,
+                'relation_name', t.formatted_class_name,
                 'relation_att_names', c.rel_att_names,
                 'check', ch.*
             ) AS check_result_json
@@ -369,14 +373,14 @@ WITH
     check_fk1007 AS (
         SELECT
             t.oid AS object_id,
-            t.class_name AS object_name,
+            t.formatted_class_name AS object_name,
             ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', t.oid,
-                'object_name', t.class_name,
+                'object_name', t.formatted_class_name,
                 'object_type', ch.object_type,
                 'check', ch.*
             ) AS check_result_json
@@ -416,7 +420,7 @@ WITH
                 'object_id', c.oid,
                 'object_name', c.conname,
                 'object_type', ch.object_type,
-                'relation_name', t.class_name,
+                'relation_name', t.formatted_class_name,
                 'constraint_type', c.contype,
                 'check', ch.*
             ) AS check_result_json
@@ -431,7 +435,7 @@ WITH
     filtered_index_list AS (
         SELECT
             ic.oid,
-            ic.class_name,
+            ic.formatted_class_name,
             ic.relam,
             ic.relnatts,
             i.*,
@@ -461,17 +465,17 @@ WITH
     check_i1001 AS (
         SELECT
             i.oid AS object_id,
-            i.class_name AS object_name,
+            i.formatted_class_name AS object_name,
             ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', i.oid,
-                'object_name', i.class_name,
+                'object_name', i.formatted_class_name,
                 'object_type', ch.object_type,
-                'relation_name', t.class_name,
-                'similar_index_name', si.class_name,
+                'relation_name', t.formatted_class_name,
+                'similar_index_name', si.formatted_class_name,
                 'object_definition', i.object_definition,
                 'simplified_object_definition', i.simplified_object_definition,
                 'similar_index_definition', si.object_definition,
@@ -501,16 +505,16 @@ WITH
     check_i1002 AS (
         SELECT
             i.oid AS object_id,
-            i.class_name AS object_name,
+            i.formatted_class_name AS object_name,
             ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', i.oid,
-                'object_name', i.class_name,
+                'object_name', i.formatted_class_name,
                 'object_type', ch.object_type,
-                'relation_name', t.class_name,
+                'relation_name', t.formatted_class_name,
                 'bad_signs', ibs.bad_signs,
                 'check', ch.*
             ) AS check_result_json
@@ -525,17 +529,17 @@ WITH
     check_i1003 AS (
         SELECT
             ui.oid AS object_id,
-            ui.class_name AS object_name,
+            ui.formatted_class_name AS object_name,
             ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', ui.oid,
-                'object_name', ui.class_name,
+                'object_name', ui.formatted_class_name,
                 'object_type', ch.object_type,
-                'relation_name', t.class_name,
-                'similar_index_name', nui.class_name,
+                'relation_name', t.formatted_class_name,
+                'similar_index_name', nui.formatted_class_name,
                 'object_definition', ui.object_definition,
                 'simplified_object_definition', ui.simplified_object_definition,
                 'similar_index_definition', nui.object_definition,
@@ -571,17 +575,17 @@ WITH
     check_i1005 AS (
         SELECT
             i.oid AS object_id,
-            i.class_name AS object_name,
+            i.formatted_class_name AS object_name,
             ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', i.oid,
-                'object_name', i.class_name,
+                'object_name', i.formatted_class_name,
                 'object_type', ch.object_type,
-                'relation_name', t.class_name,
-                'similar_index_name', si.class_name,
+                'relation_name', t.formatted_class_name,
+                'similar_index_name', si.formatted_class_name,
                 'object_definition', i.object_definition,
                 'simplified_object_definition_roughly', i.simplified_object_definition_roughly,
                 'similar_index_definition', si.object_definition,
@@ -602,16 +606,16 @@ WITH
     check_i1010 AS (
         SELECT
             i.oid AS object_id,
-            i.class_name AS object_name,
+            i.formatted_class_name AS object_name,
             ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', i.oid,
-                'object_name', i.class_name,
+                'object_name', i.formatted_class_name,
                 'object_type', ch.object_type,
-                'relation_name', t.class_name,
+                'relation_name', t.formatted_class_name,
                 'check', ch.*
             ) AS check_result_json
         FROM filtered_index_list AS i
@@ -638,20 +642,21 @@ WITH
             END::numeric(5, 2) AS unused_values_percent
         FROM pg_catalog.pg_sequence AS s
             INNER JOIN filtered_class_list sc ON s.seqrelid = sc.oid
-            LEFT JOIN pg_catalog.pg_sequences sv ON concat(sv.schemaname, '.',  sv.sequencename) = sc.class_name
+            LEFT JOIN pg_catalog.pg_sequences sv
+                ON concat(format('%I', sv.schemaname), '.', format('%I', sv.sequencename)) = sc.formatted_class_name
     ),
-    -- s1010 less 5% unused sequence values
+    -- s1010 - less 5% unused sequence values
     check_s1010 AS (
         SELECT
             s.oid AS object_id,
-            s.class_name AS object_name,
+            s.formatted_class_name AS object_name,
             ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', s.oid,
-                'object_name', s.class_name,
+                'object_name', s.formatted_class_name,
                 'object_type', ch.object_type,
                 'unused_values_percent', s.unused_values_percent,
                 'check', ch.*
@@ -663,18 +668,18 @@ WITH
             AND NOT s.seqcycle
             AND 5.0 >= s.unused_values_percent
     ),
-    -- s1011 less 10% unused sequence values
+    -- s1011 - less 10% unused sequence values
     check_s1011 AS (
         SELECT
             s.oid AS object_id,
-            s.class_name AS object_name,
+            s.formatted_class_name AS object_name,
             ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', s.oid,
-                'object_name', s.class_name,
+                'object_name', s.formatted_class_name,
                 'object_type', ch.object_type,
                 'unused_values_percent', s.unused_values_percent,
                 'check', ch.*
@@ -688,18 +693,18 @@ WITH
             -- not in parent check
             AND NOT ((SELECT enable_check_s1010 FROM conf) AND (s.oid IN (SELECT object_id FROM check_s1010)))
     ),
-    -- s1012 less 20% unused sequence values
+    -- s1012 - less 20% unused sequence values
     check_s1012 AS (
         SELECT
             s.oid AS object_id,
-            s.class_name AS object_name,
+            s.formatted_class_name AS object_name,
             ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', s.oid,
-                'object_name', s.class_name,
+                'object_name', s.formatted_class_name,
                 'object_type', ch.object_type,
                 'unused_values_percent', s.unused_values_percent,
                 'check', ch.*
@@ -721,7 +726,7 @@ WITH
             lower(regexp_replace(fsl.nspname, '\s+', '', 'g')) AS simplified_schema_name
         FROM filtered_schema_list AS fsl
     ),
-    -- n1001 confusion in name of schemas
+    -- n1001 - confusion in name of schemas
     check_n1001 AS (
         SELECT
             s1.oid AS object_id,
@@ -746,6 +751,7 @@ WITH
         WHERE
             (SELECT enable_check_n1001 FROM conf)
     ),
+    --
     filtered_attribute_list_simplified_name AS (
         SELECT
             a.*,
@@ -757,7 +763,7 @@ WITH
         WHERE
             a.attnum >= 1 AND fcl.relkind IN ('r', 'v', 'm', 'p')
     ),
-    -- n1005 confusion in name of relation attributes
+    -- n1005 - confusion in name of relation attributes
     check_n1005 AS (
         SELECT
             a1.attnum AS object_id,
@@ -784,6 +790,41 @@ WITH
             LEFT JOIN check_list ch ON ch.check_code = 'n1005'
         WHERE
             (SELECT enable_check_n1005 FROM conf)
+    ),
+    --
+    filtered_class_list_simplified_name AS (
+        SELECT
+            fcl.*,
+            lower(regexp_replace(fcl.relname, '\s+', '', 'g')) AS simplified_class_name
+        FROM filtered_class_list AS fcl
+    ),
+    -- n1010 - confusion in name of relations
+    check_n1010 AS (
+        SELECT
+            fclsn1.oid AS object_id,
+            fclsn1.formatted_class_name AS object_name,
+            ch.object_type AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', fclsn1.oid,
+                'object_name', fclsn1.formatted_class_name,
+                'object_type', ch.object_type,
+                'simplified_object_name', fclsn1.simplified_class_name,
+                'similar_object_name', fclsn2.formatted_class_name,
+                'similar_object_id', fclsn2.oid,
+                'check', ch.*
+            ) AS check_result_json
+        FROM filtered_class_list_simplified_name AS fclsn1
+            INNER JOIN filtered_class_list_simplified_name AS fclsn2
+                ON fclsn1.relnamespace = fclsn2.relnamespace AND fclsn1.oid < fclsn2.oid
+                    AND fclsn1.simplified_class_name = fclsn2.simplified_class_name
+            LEFT JOIN check_list ch ON ch.check_code = 'n1010'
+        WHERE
+            (SELECT enable_check_n1010 FROM conf)
+            AND fclsn1.relkind IN ('r', 'v', 'm', 'p')
+            AND fclsn2.relkind IN ('r', 'v', 'm', 'p')
     )
 -- result
 SELECT object_id, object_name, object_type, check_code, check_level, check_name, check_result_json FROM (
@@ -809,15 +850,17 @@ SELECT object_id, object_name, object_type, check_code, check_level, check_name,
     UNION ALL
     SELECT * FROM check_i1010  -- i1010 - b-tree index for array column
     UNION ALL
-    SELECT * FROM check_s1010  -- s1010 less 5% unused sequence values
+    SELECT * FROM check_s1010  -- s1010 - less 5% unused sequence values
     UNION ALL
-    SELECT * FROM check_s1011  -- s1011 less 10% unused sequence values
+    SELECT * FROM check_s1011  -- s1011 - less 10% unused sequence values
     UNION ALL
-    SELECT * FROM check_s1012  -- s1012 less 20% unused sequence values
+    SELECT * FROM check_s1012  -- s1012 - less 20% unused sequence values
     UNION ALL
-    SELECT * FROM check_n1001  -- n1001 confusion in name of schemas
+    SELECT * FROM check_n1001  -- n1001 - confusion in name of schemas
     UNION ALL
-    SELECT * FROM check_n1005  -- n1001 confusion in name of relation attributes
+    SELECT * FROM check_n1005  -- n1005 - confusion in name of relation attributes
+    UNION ALL
+    SELECT * FROM check_n1010  -- n1010 - confusion in name of relations
 ) AS t
 -- result filter (for error suppression)
 -- >>> WHERE
