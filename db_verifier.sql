@@ -17,7 +17,8 @@ WITH
             true  AS enable_check_s1010,     -- [critical] less 5% unused sequence values
             true  AS enable_check_s1011,     -- [error] less 10% unused sequence values
             true  AS enable_check_s1012,     -- [warning] less 20% unused sequence values
-            true  AS enable_check_n1001      -- [warning] confusion in name of schemas
+            true  AS enable_check_n1001,     -- [warning] confusion in name of schemas
+            true  AS enable_check_n1005      -- [warning] confusion in name of relation attributes
     ),
     --
     check_level_list AS (
@@ -37,11 +38,12 @@ WITH
             object_type
         FROM
             (VALUES
+                ('attribute'),
                 ('constraint'),
                 ('index'),
                 ('relation'),
-                ('sequence'),
-                ('schema')
+                ('schema'),
+                ('sequence')
             ) AS t(object_type)
     ),
     -- checks based on system catalog info
@@ -69,7 +71,8 @@ WITH
                 ('s1010',      null, 'less 5% unused sequence values', 'critical', 'sequence'),
                 ('s1011',   's1010', 'less 10% unused sequence values', 'error', 'sequence'),
                 ('s1012',   's1011', 'less 20% unused sequence values', 'warning', 'sequence'),
-                ('n1001',      null, 'confusion in name of schemas', 'warning', 'schema')
+                ('n1001',      null, 'confusion in name of schemas', 'warning', 'schema'),
+                ('n1005',      null, 'confusion in name of relation attributes', 'warning', 'attribute')
             ) AS t(check_code, parent_check_code, check_name, check_level, object_type)
             INNER JOIN check_level_list AS cll ON cll.check_level = t.check_level
             INNER JOIN object_type_list AS otl ON otl.object_type = t.object_type
@@ -111,7 +114,9 @@ WITH
                 ('s1012',  null, 'The sequence has less than 20% unused values left.'),
                 ('s1012',  'ru', 'У последовательности осталось менее 20% неиспользованных значений.'),
                 ('n1001',  null, 'There may be confusion in the name of the schemas. The names are dangerously similar.'),
-                ('n1001',  'ru', 'Возможна путаница в наименованиях схем. Наименования опасно похожи.')
+                ('n1001',  'ru', 'Возможна путаница в наименованиях схем. Наименования опасно похожи.'),
+                ('n1005',  null, 'There may be confusion in the name of the relation attributes. The names are dangerously similar.'),
+                ('n1005',  'ru', 'Возможна путаница в наименованиях атрибутов отношения (колонок). Наименования опасно похожи.')
             ) AS t(description_check_code, description_language_code, description_value)
         WHERE
             description_language_code IS NULL
@@ -176,7 +181,7 @@ WITH
             LEFT JOIN check_list ch ON ch.check_code = 'no1001'
         WHERE
             (SELECT enable_check_no1001 FROM conf)
-            AND t.relkind IN ('r')
+            AND t.relkind IN ('r', 'p')
             -- no constraint PK [test - public.no1001_1]
             AND NOT EXISTS (SELECT * FROM pg_catalog.pg_constraint AS c
                 WHERE t.oid = c.conrelid AND t.relnamespace = c.connamespace AND c.contype IN ('p')
@@ -235,7 +240,7 @@ WITH
             (SELECT enable_check_no1002 FROM conf)
             -- not in parent check
             AND NOT ((SELECT enable_check_no1001 FROM conf) AND (t.oid IN (SELECT object_id FROM check_no1001)))
-            AND t.relkind IN ('r')
+            AND t.relkind IN ('r', 'p')
             -- no constraint PK
             AND NOT EXISTS (SELECT * FROM pg_catalog.pg_constraint AS c
                 WHERE t.oid = c.conrelid AND t.relnamespace = c.connamespace AND c.contype IN ('p')
@@ -253,8 +258,8 @@ WITH
         FROM pg_catalog.pg_constraint AS c
         WHERE
             c.contype IN ('f')
-            AND c.conrelid IN (SELECT oid FROM filtered_class_list WHERE relkind IN ('r'))
-            AND c.confrelid IN (SELECT oid FROM filtered_class_list WHERE relkind IN ('r'))
+            AND c.conrelid IN (SELECT oid FROM filtered_class_list WHERE relkind IN ('r', 'm', 'p'))
+            AND c.confrelid IN (SELECT oid FROM filtered_class_list WHERE relkind IN ('r', 'm', 'p'))
     ),
     -- filtered FK list with attribute
     filtered_fk_list_attribute AS (
@@ -379,7 +384,7 @@ WITH
             LEFT JOIN check_list ch ON ch.check_code = 'fk1007'
         WHERE
             (SELECT enable_check_fk1007 FROM conf)
-            AND relkind IN ('r')
+            AND relkind IN ('r', 'p')
             AND t.oid NOT IN (SELECT conrelid FROM filtered_fk_list)
             AND t.oid NOT IN (SELECT confrelid FROM filtered_fk_list)
     ),
@@ -396,7 +401,7 @@ WITH
             c.convalidated
         FROM pg_catalog.pg_constraint AS c
         WHERE
-            c.conrelid IN (SELECT oid FROM filtered_class_list WHERE relkind IN ('r'))
+            c.conrelid IN (SELECT oid FROM filtered_class_list WHERE relkind IN ('r', 'm', 'p'))
     ),
     -- c1001 - constraint not validated
     check_c1001 AS (
@@ -713,7 +718,7 @@ WITH
     filtered_schema_list_simplified_name AS (
         SELECT
             fsl.*,
-            lower(regexp_replace(fsl.nspname, '\s+', '', 'g')) AS simplified_name
+            lower(regexp_replace(fsl.nspname, '\s+', '', 'g')) AS simplified_schema_name
         FROM filtered_schema_list AS fsl
     ),
     -- n1001 confusion in name of schemas
@@ -729,18 +734,58 @@ WITH
                 'object_id', s1.oid,
                 'object_name', s1.formatted_schema_name,
                 'object_type', ch.object_type,
-                'simplified_object_name', s1.simplified_name,
+                'simplified_object_name', s1.simplified_schema_name,
                 'similar_object_name', s2.formatted_schema_name,
                 'similar_object_id', s2.oid,
                 'check', ch.*
             ) AS check_result_json
         FROM filtered_schema_list_simplified_name AS s1
-            INNER JOIN filtered_schema_list_simplified_name AS s2 ON s1.simplified_name = s2.simplified_name
-                AND s1.oid < s2.oid
+            INNER JOIN filtered_schema_list_simplified_name AS s2
+                ON s1.simplified_schema_name = s2.simplified_schema_name AND s1.oid < s2.oid
             LEFT JOIN check_list ch ON ch.check_code = 'n1001'
         WHERE
             (SELECT enable_check_n1001 FROM conf)
+    ),
+    filtered_attribute_list_simplified_name AS (
+        SELECT
+            a.*,
+            fcl.formatted_class_name,
+            concat(fcl.formatted_class_name, '.',  format('%I', a.attname)) AS formatted_attribute_name,
+            lower(regexp_replace(a.attname, '\s+', '', 'g')) AS simplified_attribute_name
+        FROM pg_catalog.pg_attribute AS a
+            INNER JOIN filtered_class_list AS fcl ON a.attrelid = fcl.oid
+        WHERE
+            a.attnum >= 1 AND fcl.relkind IN ('r', 'v', 'm', 'p')
+    ),
+    -- n1005 confusion in name of relation attributes
+    check_n1005 AS (
+        SELECT
+            a1.attnum AS object_id,
+            a1.formatted_attribute_name AS object_name,
+            ch.object_type AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', a1.attnum,
+                'object_name', a1.formatted_attribute_name,
+                'object_type', ch.object_type,
+                'simplified_object_name', a1.simplified_attribute_name,
+                'similar_object_name', a2.formatted_attribute_name,
+                'similar_object_id', a2.attnum,
+                'relation_name', a1.formatted_class_name,
+                'relation_id', a1.attrelid,
+                'check', ch.*
+            ) AS check_result_json
+        FROM filtered_attribute_list_simplified_name AS a1
+            INNER JOIN filtered_attribute_list_simplified_name AS a2
+                ON a1.simplified_attribute_name = a2.simplified_attribute_name AND a1.attrelid = a2.attrelid
+                    AND a1.attnum < a2.attnum
+            LEFT JOIN check_list ch ON ch.check_code = 'n1005'
+        WHERE
+            (SELECT enable_check_n1005 FROM conf)
     )
+-- result
 SELECT object_id, object_name, object_type, check_code, check_level, check_name, check_result_json FROM (
     SELECT * FROM check_no1001 -- no1001 - no unique key
     UNION ALL
@@ -771,6 +816,8 @@ SELECT object_id, object_name, object_type, check_code, check_level, check_name,
     SELECT * FROM check_s1012  -- s1012 less 20% unused sequence values
     UNION ALL
     SELECT * FROM check_n1001  -- n1001 confusion in name of schemas
+    UNION ALL
+    SELECT * FROM check_n1005  -- n1001 confusion in name of relation attributes
 ) AS t
 -- result filter (for error suppression)
 -- >>> WHERE
