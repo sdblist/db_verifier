@@ -1,5 +1,5 @@
 -- PRIMARY KEY + same data types + nullable
--- fk1002 - no
+-- fk1002 - yes
 DROP TABLE IF EXISTS public.fk1002_1 CASCADE;
 CREATE TABLE public.fk1002_1
 (
@@ -23,3 +23,27 @@ CREATE TABLE public.fk1002_1_fk
 INSERT INTO public.fk1002_1_fk (fk1002_1_id, value) VALUES(NULL, 'NULL');
 INSERT INTO public.fk1002_1_fk (fk1002_1_id, value) VALUES(1, '1');
 INSERT INTO public.fk1002_1_fk (fk1002_1_id, value) VALUES(2000000000, '2000000000');
+
+-- PRIMARY KEY + same data types + nullable + multi column FK
+-- fk1002 - yes
+DROP TABLE IF EXISTS public.fk1002_2 CASCADE;
+CREATE TABLE public.fk1002_2
+(
+    id    integer NOT NULL,
+    value varchar(10),
+    CONSTRAINT fk1002_2_unique UNIQUE (id, value)
+);
+
+INSERT INTO public.fk1002_2 (id, value) VALUES (10, NULL);
+INSERT INTO public.fk1002_2 (id, value) VALUES (20, '20');
+
+DROP TABLE IF EXISTS public.fk1002_2_fk;
+CREATE TABLE public.fk1002_2_fk
+(
+    fk1002_2_id integer NOT NULL,
+    fk1002_2_value varchar(10),
+    CONSTRAINT fk1002_2_fk_fk1002_2 FOREIGN KEY (fk1002_2_id, fk1002_2_value) REFERENCES public.fk1002_2(id, value)
+);
+INSERT INTO public.fk1002_2_fk (fk1002_2_id, fk1002_2_value) VALUES(20, '20');
+INSERT INTO public.fk1002_2_fk (fk1002_2_id, fk1002_2_value) VALUES(30, NULL);
+
