@@ -30,6 +30,7 @@
 | s1010  |             | less 5% unused sequence values        | critical | enable        | У последовательности осталось менее 5% неиспользованных значений.                                                                    |
 | s1011  | s1010       | less 10% unused sequence values       | error    | enable        | У последовательности осталось менее 10% неиспользованных значений.                                                                   |
 | s1012  | s1011       | less 20% unused sequence values       | warning  | enable        | У последовательности осталось менее 20% неиспользованных значений.                                                                   |
+| n1001  |             | confusion in name of schemas          | warning  | enable        | Возможна путаница в наименованиях схем. Наименования опасно похожи.                                                                  |
 
 
 

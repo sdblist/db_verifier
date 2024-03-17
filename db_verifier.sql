@@ -16,7 +16,8 @@ WITH
             true  AS enable_check_i1010,     -- [notice] b-tree index for array column
             true  AS enable_check_s1010,     -- [critical] less 5% unused sequence values
             true  AS enable_check_s1011,     -- [error] less 10% unused sequence values
-            true  AS enable_check_s1012      -- [warning] less 20% unused sequence values
+            true  AS enable_check_s1012,     -- [warning] less 20% unused sequence values
+            true  AS enable_check_n1001      -- [warning] confusion in name of schemas
     ),
     --
     check_level_list AS (
@@ -39,7 +40,8 @@ WITH
                 ('constraint'),
                 ('index'),
                 ('relation'),
-                ('sequence')
+                ('sequence'),
+                ('schema')
             ) AS t(object_type)
     ),
     -- checks based on system catalog info
@@ -66,7 +68,8 @@ WITH
                 ('i1010',      null, 'b-tree index for array column', 'notice', 'index'),
                 ('s1010',      null, 'less 5% unused sequence values', 'critical', 'sequence'),
                 ('s1011',   's1010', 'less 10% unused sequence values', 'error', 'sequence'),
-                ('s1012',   's1011', 'less 20% unused sequence values', 'warning', 'sequence')
+                ('s1012',   's1011', 'less 20% unused sequence values', 'warning', 'sequence'),
+                ('n1001',      null, 'confusion in name of schemas', 'warning', 'schema')
             ) AS t(check_code, parent_check_code, check_name, check_level, object_type)
             INNER JOIN check_level_list AS cll ON cll.check_level = t.check_level
             INNER JOIN object_type_list AS otl ON otl.object_type = t.object_type
@@ -106,7 +109,9 @@ WITH
                 ('s1011',  null, 'The sequence has less than 10% unused values left.'),
                 ('s1011',  'ru', 'У последовательности осталось менее 10% неиспользованных значений.'),
                 ('s1012',  null, 'The sequence has less than 20% unused values left.'),
-                ('s1012',  'ru', 'У последовательности осталось менее 20% неиспользованных значений.')
+                ('s1012',  'ru', 'У последовательности осталось менее 20% неиспользованных значений.'),
+                ('n1001',  null, 'There may be confusion in the name of the schemas. The names are dangerously similar.'),
+                ('n1001',  'ru', 'Возможна путаница в наименованиях схем. Наименования опасно похожи.')
             ) AS t(description_check_code, description_language_code, description_value)
         WHERE
             description_language_code IS NULL
@@ -124,8 +129,7 @@ WITH
     --
     excluded_schema_list AS (
         SELECT
-            oid AS excluded_schema_oid,
-            nspname AS excluded_schema_nspname
+            oid
         FROM pg_catalog.pg_namespace
         WHERE
             (
@@ -137,14 +141,21 @@ WITH
             )
     ),
     --
+    filtered_schema_list AS (
+        SELECT
+            n.*,
+            format('%I', n.nspname) AS formatted_schema_name
+        FROM pg_catalog.pg_namespace AS n
+        WHERE n.oid NOT IN (SELECT oid FROM excluded_schema_list)
+    ),
+    --
     filtered_class_list AS (
         SELECT
             c.*,
-            concat(n.nspname, '.',  c.relname) AS class_name
+            concat(n.nspname, '.',  c.relname) AS class_name,
+            concat(n.formatted_schema_name, '.',  format('%I', c.relname)) AS formatted_class_name
         FROM pg_catalog.pg_class AS c
-            LEFT JOIN pg_catalog.pg_namespace AS n ON c.relnamespace = n.oid
-        WHERE
-            c.relnamespace NOT IN (SELECT excluded_schema_oid FROM excluded_schema_list)
+            INNER JOIN filtered_schema_list AS n ON c.relnamespace = n.oid
     ),
     -- no1001 - no unique key
     check_no1001 AS (
@@ -697,6 +708,38 @@ WITH
             -- not in parent check
             AND NOT ((SELECT enable_check_s1010 FROM conf) AND (s.oid IN (SELECT object_id FROM check_s1010)))
             AND NOT ((SELECT enable_check_s1011 FROM conf) AND (s.oid IN (SELECT object_id FROM check_s1011)))
+    ),
+    -- filtered schema list with simplified name
+    filtered_schema_list_simplified_name AS (
+        SELECT
+            fsl.*,
+            lower(regexp_replace(fsl.nspname, '\s+', '', 'g')) AS simplified_name
+        FROM filtered_schema_list AS fsl
+    ),
+    -- n1001 confusion in name of schemas
+    check_n1001 AS (
+        SELECT
+            s1.oid AS object_id,
+            s1.formatted_schema_name AS object_name,
+            ch.object_type AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', s1.oid,
+                'object_name', s1.formatted_schema_name,
+                'object_type', ch.object_type,
+                'simplified_object_name', s1.simplified_name,
+                'similar_object_name', s2.formatted_schema_name,
+                'similar_object_id', s2.oid,
+                'check', ch.*
+            ) AS check_result_json
+        FROM filtered_schema_list_simplified_name AS s1
+            INNER JOIN filtered_schema_list_simplified_name AS s2 ON s1.simplified_name = s2.simplified_name
+                AND s1.oid < s2.oid
+            LEFT JOIN check_list ch ON ch.check_code = 'n1001'
+        WHERE
+            (SELECT enable_check_n1001 FROM conf)
     )
 SELECT object_id, object_name, object_type, check_code, check_level, check_name, check_result_json FROM (
     SELECT * FROM check_no1001 -- no1001 - no unique key
@@ -726,6 +769,8 @@ SELECT object_id, object_name, object_type, check_code, check_level, check_name,
     SELECT * FROM check_s1011  -- s1011 less 10% unused sequence values
     UNION ALL
     SELECT * FROM check_s1012  -- s1012 less 20% unused sequence values
+    UNION ALL
+    SELECT * FROM check_n1001  -- n1001 confusion in name of schemas
 ) AS t
 -- result filter (for error suppression)
 -- >>> WHERE
