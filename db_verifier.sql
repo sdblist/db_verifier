@@ -8,6 +8,8 @@ WITH
             true  AS enable_check_fk1001,    -- [error] check fk uses mismatched types
             false AS enable_check_fk1002,    -- [warning] check fk uses nullable columns
             false AS enable_check_fk1007,    -- [notice] not involved in foreign keys
+            true  AS enable_check_fk1010,    -- [warning] similar FK
+            true  AS enable_check_fk1011,    -- [warning] FK have common attributes
             true  AS enable_check_c1001,     -- [warning] constraint not validated
             true  AS enable_check_i1001,     -- [warning] similar indexes
             true  AS enable_check_i1002,     -- [error] index has bad signs
@@ -63,6 +65,8 @@ WITH
                 ('fk1001',     null, 'fk uses mismatched types', 'error', 'constraint'),
                 ('fk1002',     null, 'fk uses nullable columns', 'warning', 'constraint'),
                 ('fk1007',     null, 'not involved in foreign keys', 'notice', 'relation'),
+                ('fk1010',     null, 'similar FK', 'warning', 'constraint'),
+                ('fk1011', 'fk1010', 'FK have common attributes', 'warning', 'constraint'),
                 ('c1001',      null, 'constraint not validated', 'warning', 'constraint'),
                 ('i1001',      null, 'similar indexes', 'warning', 'index'),
                 ('i1002',      null, 'index has bad signs', 'error', 'index'),
@@ -97,6 +101,10 @@ WITH
                 ('fk1002', 'ru', 'Внешний ключ использует колонки, допускающие значение NULL.'),
                 ('fk1007', null, 'Relation is not involved in foreign keys.'),
                 ('fk1007', 'ru', 'Отношение не используется во внешних ключах (возможно оно больше не нужно).'),
+                ('fk1010', null, 'FK are very similar.'),
+                ('fk1010', 'ru', 'FK очень похожи (возможно совпадают).'),
+                ('fk1011', null, 'There are multiple FK between relations, FK have common attributes.'),
+                ('fk1011', 'ru', 'Между отношениями несколько FK, FK имеют общие атрибуты.'),
                 ('c1001',  null, 'Constraint was not validated for all data.'),
                 ('c1001',  'ru', 'Ограничение не проверено для всех данных (возможно присутствуют записи, нарушающие ограничение).'),
                 ('i1001',  null, 'Indexes are very similar.'),
@@ -254,7 +262,7 @@ WITH
     filtered_fk_list AS (
         SELECT
             c.oid,
-            c.conname,
+            format('%I', c.conname) AS formatted_constraint_name,
             c.conrelid,
             c.confrelid,
             c.conkey,
@@ -269,7 +277,7 @@ WITH
     filtered_fk_list_attribute AS (
         SELECT
             cfk.oid,
-            cfk.conname,
+            cfk.formatted_constraint_name,
             cfk.conrelid,
             cfk.confrelid,
             cfk_conkey.conkey_order AS att_order,
@@ -296,14 +304,14 @@ WITH
     check_fk1001 AS (
         SELECT
             c.oid AS object_id,
-            c.conname AS object_name,
+            c.formatted_constraint_name AS object_name,
             ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', c.oid,
-                'object_name', c.conname,
+                'object_name', c.formatted_constraint_name,
                 'object_type', ch.object_type,
                 'relation_name', t.formatted_class_name,
                 'relation_att_names', c.rel_att_names,
@@ -314,7 +322,7 @@ WITH
         FROM (
             SELECT
                 oid,
-                conname,
+                formatted_constraint_name,
                 conrelid,
                 confrelid,
                 array_agg (rel_att_name order by att_order ) as rel_att_names,
@@ -336,14 +344,14 @@ WITH
     check_fk1002 AS (
         SELECT
             c.oid AS object_id,
-            c.conname AS object_name,
+            c.formatted_constraint_name AS object_name,
             ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', c.oid,
-                'object_name', c.conname,
+                'object_name', c.formatted_constraint_name,
                 'object_type', ch.object_type,
                 'relation_name', t.formatted_class_name,
                 'relation_att_names', c.rel_att_names,
@@ -352,10 +360,10 @@ WITH
         FROM (
             SELECT
                 oid,
-                conname,
+                formatted_constraint_name,
                 conrelid,
                 confrelid,
-                array_agg (rel_att_name order by att_order ) as rel_att_names
+                array_agg (rel_att_name order by att_order) as rel_att_names
             FROM filtered_fk_list_attribute
             WHERE
                 (NOT rel_att_notnull)
@@ -392,12 +400,89 @@ WITH
             AND t.oid NOT IN (SELECT conrelid FROM filtered_fk_list)
             AND t.oid NOT IN (SELECT confrelid FROM filtered_fk_list)
     ),
+    --
+    filtered_fk_list_attribute_grouped AS (
+        SELECT
+            oid,
+            formatted_constraint_name,
+            conrelid,
+            confrelid,
+            array_agg (rel_att_name order by att_order) as rel_att_names,
+            array_agg (frel_att_name order by att_order) as frel_att_names
+        FROM filtered_fk_list_attribute
+        GROUP BY 1, 2, 3, 4
+    ),
+    -- fk1010 - similar FK
+    check_fk1010 AS (
+        SELECT
+            c.oid AS object_id,
+            c.formatted_constraint_name AS object_name,
+            ch.object_type AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', c.oid,
+                'object_name', c.formatted_constraint_name,
+                'object_type', ch.object_type,
+                'relation_name', t.formatted_class_name,
+                'relation_att_names', c.rel_att_names,
+                'foreign_relation_name', tf.formatted_class_name,
+                'foreign_relation_att_names', c.frel_att_names,
+                'similar_constraint_name', cf.formatted_constraint_name,
+                'check', ch.*
+            ) AS check_result_json
+        FROM filtered_fk_list_attribute_grouped AS c
+            INNER JOIN filtered_fk_list_attribute_grouped AS cf ON c.oid < cf.oid AND c.conrelid = cf.conrelid
+                AND c.confrelid = cf.confrelid AND c.rel_att_names = cf.rel_att_names
+            INNER JOIN filtered_class_list AS t
+                ON t.oid = c.conrelid
+            INNER JOIN filtered_class_list AS tf
+                ON tf.oid = c.confrelid
+            LEFT JOIN check_list ch ON ch.check_code = 'fk1010'
+        WHERE
+            (SELECT enable_check_fk1010 FROM conf)
+    ),
+    -- fk1011 - FK have common attributes
+    check_fk1011 AS (
+        SELECT
+            c.oid AS object_id,
+            c.formatted_constraint_name AS object_name,
+            ch.object_type AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', c.oid,
+                'object_name', c.formatted_constraint_name,
+                'object_type', ch.object_type,
+                'relation_name', t.formatted_class_name,
+                'relation_att_names', c.rel_att_names,
+                'foreign_relation_name', tf.formatted_class_name,
+                'foreign_relation_att_names', c.frel_att_names,
+                'similar_constraint_name', cf.formatted_constraint_name,
+                'similar_constraint_att_names', cf.rel_att_names,
+                'check', ch.*
+            ) AS check_result_json
+        FROM filtered_fk_list_attribute_grouped AS c
+            INNER JOIN filtered_fk_list_attribute_grouped AS cf ON c.oid < cf.oid AND c.conrelid = cf.conrelid
+                AND c.confrelid = cf.confrelid AND c.rel_att_names && cf.rel_att_names
+            INNER JOIN filtered_class_list AS t
+                ON t.oid = c.conrelid
+            INNER JOIN filtered_class_list AS tf
+                ON tf.oid = c.confrelid
+            LEFT JOIN check_list ch ON ch.check_code = 'fk1011'
+        WHERE
+            (SELECT enable_check_fk1011 FROM conf)
+            -- not in parent check
+            AND NOT ((SELECT enable_check_fk1010 FROM conf) AND (c.oid IN (SELECT object_id FROM check_fk1010)))
+    ),
     -- filtered constraint list (minimal)
     filtered_c_list AS (
         SELECT
             c.oid,
             c.contype,
-            c.conname,
+            format('%I', c.conname) AS formatted_constraint_name,
             c.conrelid,
             c.confrelid,
             c.conkey,
@@ -411,14 +496,14 @@ WITH
     check_c1001 AS (
         SELECT
             c.oid AS object_id,
-            c.conname AS object_name,
+            c.formatted_constraint_name AS object_name,
             ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', c.oid,
-                'object_name', c.conname,
+                'object_name', c.formatted_constraint_name,
                 'object_type', ch.object_type,
                 'relation_name', t.formatted_class_name,
                 'constraint_type', c.contype,
@@ -456,7 +541,7 @@ WITH
             		' DESC\)', ')'),
             		' DESC,', ',')
             	 AS simplified_object_definition,
-            (SELECT array_agg(c.conname) FROM pg_catalog.pg_constraint AS c WHERE c.conindid = ic.oid)
+            (SELECT array_agg(format('%I', c.conname)) FROM pg_catalog.pg_constraint AS c WHERE c.conindid = ic.oid)
                 AS used_in_constraint
         FROM pg_catalog.pg_index AS i
             INNER JOIN filtered_class_list ic ON i.indexrelid = ic.oid
@@ -837,6 +922,10 @@ SELECT object_id, object_name, object_type, check_code, check_level, check_name,
     SELECT * FROM check_fk1002 -- fk1002 - fk uses nullable columns
     UNION ALL
     SELECT * FROM check_fk1007 -- fk1007 - not involved in foreign keys
+    UNION ALL
+    SELECT * FROM check_fk1010 -- fk1010 - similar FK
+    UNION ALL
+    SELECT * FROM check_fk1011 -- fk1011 - FK have common attributes
     UNION ALL
     SELECT * FROM check_c1001  -- c1001 - constraint not validated
     UNION ALL
