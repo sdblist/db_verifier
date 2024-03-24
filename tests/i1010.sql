@@ -17,11 +17,11 @@ CREATE INDEX i_gin_value ON public.i1010_1 USING gin (value);
 SET enable_seqscan TO off;
 
 -- Bitmap Index Scan on i_gin_value
-EXPLAIN ANALYZE
+EXPLAIN
 SELECT id FROM public.i1010_1 WHERE value @> ARRAY[1];
 
 -- Index Scan using i_btree_value
-EXPLAIN ANALYZE
+EXPLAIN
 SELECT id FROM public.i1010_1 WHERE value = ARRAY[2, 4, 6];
 
 -- SET enable_seqscan TO on;
