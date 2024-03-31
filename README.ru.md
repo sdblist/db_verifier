@@ -22,7 +22,7 @@
 | fk1002 |             | fk uses nullable columns                 | warning  | disable       | Внешний ключ использует колонки, допускающие значение NULL.                                                                          |
 | fk1007 |             | not involved in foreign keys             | notice   | disable       | Отношение не используется во внешних ключах (возможно оно больше не нужно).                                                          |
 | fk1010 |             | similar FK                               | warning  | enable        | FK очень похожи (возможно совпадают).                                                                                                |
-| fk1011 | fk1010      | FK have common attributes                | warning  | enable        | Между отношениями несколько FK, FK имеют общие атрибуты.                                                                   |
+| fk1011 | fk1010      | FK have common attributes                | warning  | enable        | Между отношениями несколько FK, FK имеют общие атрибуты.                                                                             |
 | c1001  |             | constraint not validated                 | warning  | enable        | Ограничение не проверено для всех данных (возможно присутствуют записи, нарушающие ограничение).                                     |
 | i1001  |             | similar indexes                          | warning  | enable        | Индексы очень похожи (возможно совпадают).                                                                                           |
 | i1002  |             | index has bad signs                      | error    | enable        | Индекс имеет признаки проблем.                                                                                                       |
@@ -35,6 +35,8 @@
 | n1001  |             | confusion in name of schemas             | warning  | enable        | Возможна путаница в наименованиях схем. Наименования опасно похожи.                                                                  |
 | n1005  |             | confusion in name of relation attributes | warning  | enable        | Возможна путаница в наименованиях атрибутов отношения (колонок). Наименования опасно похожи.                                         |
 | n1010  |             | confusion in name of relations           | warning  | enable        | Возможна путаница в наименованиях отношений в одной схеме. Наименования опасно похожи.                                               |
+| n1015  |             | confusion in name of indexes             | warning  | enable        | Возможна путаница в наименованиях индексов. Наименования опасно похожи.                                                              |
+| n1020  |             | confusion in name of sequences           | warning  | enable        | Возможна путаница в наименованиях последовательностей в одной схеме. Наименования опасно похожи.                                     |
 
 
 

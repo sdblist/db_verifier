@@ -21,7 +21,11 @@ WITH
             true  AS enable_check_s1012,     -- [warning] less 20% unused sequence values
             true  AS enable_check_n1001,     -- [warning] confusion in name of schemas
             true  AS enable_check_n1005,     -- [warning] confusion in name of relation attributes
-            true  AS enable_check_n1010      -- [warning] confusion in name of relations
+            true  AS enable_check_n1010,     -- [warning] confusion in name of relations
+            true  AS enable_check_n1015,     -- [warning] confusion in name of indexes
+            true  AS enable_check_n1020,     -- [warning] confusion in name of sequences
+            --
+            '[\s+.]' AS unwanted_characters  -- unwanted characters in object names
     ),
     --
     check_level_list AS (
@@ -78,7 +82,9 @@ WITH
                 ('s1012',   's1011', 'less 20% unused sequence values', 'warning', 'sequence'),
                 ('n1001',      null, 'confusion in name of schemas', 'warning', 'schema'),
                 ('n1005',      null, 'confusion in name of relation attributes', 'warning', 'attribute'),
-                ('n1010',      null, 'confusion in name of relations', 'warning', 'relation')
+                ('n1010',      null, 'confusion in name of relations', 'warning', 'relation'),
+                ('n1015',      null, 'confusion in name of indexes', 'warning', 'index'),
+                ('n1020',      null, 'confusion in name of sequences', 'warning', 'sequence')
             ) AS t(check_code, parent_check_code, check_name, check_level, object_type)
             INNER JOIN check_level_list AS cll ON cll.check_level = t.check_level
             INNER JOIN object_type_list AS otl ON otl.object_type = t.object_type
@@ -128,7 +134,11 @@ WITH
                 ('n1005',  null, 'There may be confusion in the name of the relation attributes. The names are dangerously similar.'),
                 ('n1005',  'ru', 'Возможна путаница в наименованиях атрибутов отношения (колонок). Наименования опасно похожи.'),
                 ('n1010',  null, 'There may be confusion in the name of the relations in the same schema. The names are dangerously similar.'),
-                ('n1010',  'ru', 'Возможна путаница в наименованиях отношений в одной схеме. Наименования опасно похожи.')
+                ('n1010',  'ru', 'Возможна путаница в наименованиях отношений в одной схеме. Наименования опасно похожи.'),
+                ('n1015',  null, 'There may be confusion in the name of the relation indexes. The names are dangerously similar.'),
+                ('n1015',  'ru', 'Возможна путаница в наименованиях индексов. Наименования опасно похожи.'),
+                ('n1020',  null, 'There may be confusion in the name of the sequences in the same schema. The names are dangerously similar.'),
+                ('n1020',  'ru', 'Возможна путаница в наименованиях последовательностей в одной схеме. Наименования опасно похожи.')
             ) AS t(description_check_code, description_language_code, description_value)
         WHERE
             description_language_code IS NULL
@@ -161,7 +171,11 @@ WITH
     filtered_schema_list AS (
         SELECT
             n.*,
-            format('%I', n.nspname) AS formatted_schema_name
+            format('%I', n.nspname) AS formatted_schema_name,
+            regexp_replace(n.nspname, (SELECT unwanted_characters FROM conf)::text, '', 'g')
+                AS schema_name_wo_unwanted_characters,
+            lower(regexp_replace(n.nspname, (SELECT unwanted_characters FROM conf)::text, '', 'g'))
+                AS schema_name_wo_unwanted_characters_lower
         FROM pg_catalog.pg_namespace AS n
         WHERE n.oid NOT IN (SELECT oid FROM excluded_schema_list)
     ),
@@ -169,23 +183,43 @@ WITH
     filtered_class_list AS (
         SELECT
             c.*,
-            concat(n.nspname, '.',  c.relname) AS class_name,
-            concat(n.formatted_schema_name, '.',  format('%I', c.relname)) AS formatted_class_name
+            concat(fsl.nspname, '.',  c.relname) AS class_full_name,
+            concat(fsl.formatted_schema_name, '.',  format('%I', c.relname)) AS formatted_class_full_name,
+            regexp_replace(c.relname, (SELECT unwanted_characters FROM conf)::text, '', 'g')
+                AS class_name_wo_unwanted_characters,
+            lower(regexp_replace(c.relname, (SELECT unwanted_characters FROM conf)::text, '', 'g'))
+                AS class_name_wo_unwanted_characters_lower
         FROM pg_catalog.pg_class AS c
-            INNER JOIN filtered_schema_list AS n ON c.relnamespace = n.oid
+            INNER JOIN filtered_schema_list AS fsl ON c.relnamespace = fsl.oid
+    ),
+    --
+    filtered_attribute_list AS (
+        SELECT
+            a.*,
+            format('%I', a.attname) AS formatted_attribute_name,
+            concat(fcl.formatted_class_full_name, '.',  format('%I', a.attname)) AS formatted_attribute_full_name,
+            regexp_replace(a.attname, (SELECT unwanted_characters FROM conf)::text, '', 'g')
+                AS attribute_name_wo_unwanted_characters,
+            lower(regexp_replace(a.attname, (SELECT unwanted_characters FROM conf)::text, '', 'g'))
+                AS attribute_name_wo_unwanted_characters_lower,
+            fcl.formatted_class_full_name
+        FROM pg_catalog.pg_attribute AS a
+            INNER JOIN filtered_class_list AS fcl ON a.attrelid = fcl.oid
+        WHERE
+            a.attnum >= 1
     ),
     -- no1001 - no unique key
     check_no1001 AS (
         SELECT
             t.oid AS object_id,
-            t.formatted_class_name AS object_name,
+            t.formatted_class_full_name AS object_name,
             ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', t.oid,
-                'object_name', t.formatted_class_name,
+                'object_name', t.formatted_class_full_name,
                 'object_type', ch.object_type,
                 'check', ch.*
             ) AS check_result_json
@@ -235,14 +269,14 @@ WITH
     check_no1002 AS (
         SELECT
             t.oid AS object_id,
-            t.formatted_class_name AS object_name,
+            t.formatted_class_full_name AS object_name,
             ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', t.oid,
-                'object_name', t.formatted_class_name,
+                'object_name', t.formatted_class_full_name,
                 'object_type', ch.object_type,
                 'check', ch.*
             ) AS check_result_json
@@ -295,9 +329,9 @@ WITH
             CROSS JOIN LATERAL UNNEST(cfk.conkey) WITH ORDINALITY AS cfk_conkey(conkey_number, conkey_order)
             LEFT JOIN LATERAL UNNEST(cfk.confkey) WITH ORDINALITY AS cfk_confkey(confkey_number, confkey_order)
                 ON cfk_conkey.conkey_order = cfk_confkey.confkey_order
-            LEFT JOIN pg_catalog.pg_attribute AS rel_att
+            LEFT JOIN filtered_attribute_list AS rel_att
                 ON rel_att.attrelid = cfk.conrelid AND rel_att.attnum = cfk_conkey.conkey_number
-            LEFT JOIN pg_catalog.pg_attribute AS frel_att
+            LEFT JOIN filtered_attribute_list AS frel_att
                 ON frel_att.attrelid = cfk.confrelid AND frel_att.attnum = cfk_confkey.confkey_number
     ),
     -- fk1001 - fk uses mismatched types
@@ -313,9 +347,9 @@ WITH
                 'object_id', c.oid,
                 'object_name', c.formatted_constraint_name,
                 'object_type', ch.object_type,
-                'relation_name', t.formatted_class_name,
+                'relation_name', t.formatted_class_full_name,
                 'relation_att_names', c.rel_att_names,
-                'foreign_relation_name', tf.formatted_class_name,
+                'foreign_relation_name', tf.formatted_class_full_name,
                 'foreign_relation_att_names', c.frel_att_names,
                 'check', ch.*
             ) AS check_result_json
@@ -353,7 +387,7 @@ WITH
                 'object_id', c.oid,
                 'object_name', c.formatted_constraint_name,
                 'object_type', ch.object_type,
-                'relation_name', t.formatted_class_name,
+                'relation_name', t.formatted_class_full_name,
                 'relation_att_names', c.rel_att_names,
                 'check', ch.*
             ) AS check_result_json
@@ -381,14 +415,14 @@ WITH
     check_fk1007 AS (
         SELECT
             t.oid AS object_id,
-            t.formatted_class_name AS object_name,
+            t.formatted_class_full_name AS object_name,
             ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', t.oid,
-                'object_name', t.formatted_class_name,
+                'object_name', t.formatted_class_full_name,
                 'object_type', ch.object_type,
                 'check', ch.*
             ) AS check_result_json
@@ -425,9 +459,9 @@ WITH
                 'object_id', c.oid,
                 'object_name', c.formatted_constraint_name,
                 'object_type', ch.object_type,
-                'relation_name', t.formatted_class_name,
+                'relation_name', t.formatted_class_full_name,
                 'relation_att_names', c.rel_att_names,
-                'foreign_relation_name', tf.formatted_class_name,
+                'foreign_relation_name', tf.formatted_class_full_name,
                 'foreign_relation_att_names', c.frel_att_names,
                 'similar_constraint_name', cf.formatted_constraint_name,
                 'check', ch.*
@@ -456,9 +490,9 @@ WITH
                 'object_id', c.oid,
                 'object_name', c.formatted_constraint_name,
                 'object_type', ch.object_type,
-                'relation_name', t.formatted_class_name,
+                'relation_name', t.formatted_class_full_name,
                 'relation_att_names', c.rel_att_names,
-                'foreign_relation_name', tf.formatted_class_name,
+                'foreign_relation_name', tf.formatted_class_full_name,
                 'foreign_relation_att_names', c.frel_att_names,
                 'similar_constraint_name', cf.formatted_constraint_name,
                 'similar_constraint_att_names', cf.rel_att_names,
@@ -466,7 +500,7 @@ WITH
             ) AS check_result_json
         FROM filtered_fk_list_attribute_grouped AS c
             INNER JOIN filtered_fk_list_attribute_grouped AS cf ON c.oid < cf.oid AND c.conrelid = cf.conrelid
-                AND c.confrelid = cf.confrelid AND c.rel_att_names && cf.rel_att_names
+                AND c.confrelid = cf.confrelid AND (c.rel_att_names && cf.rel_att_names)
             INNER JOIN filtered_class_list AS t
                 ON t.oid = c.conrelid
             INNER JOIN filtered_class_list AS tf
@@ -505,7 +539,7 @@ WITH
                 'object_id', c.oid,
                 'object_name', c.formatted_constraint_name,
                 'object_type', ch.object_type,
-                'relation_name', t.formatted_class_name,
+                'relation_name', t.formatted_class_full_name,
                 'constraint_type', c.contype,
                 'check', ch.*
             ) AS check_result_json
@@ -520,7 +554,9 @@ WITH
     filtered_index_list AS (
         SELECT
             ic.oid,
-            ic.formatted_class_name,
+            ic.formatted_class_full_name AS formatted_index_full_name,
+            ic.class_name_wo_unwanted_characters AS index_name_wo_unwanted_characters,
+            ic.class_name_wo_unwanted_characters_lower AS index_name_wo_unwanted_characters_lower,
             ic.relam,
             ic.relnatts,
             i.*,
@@ -550,17 +586,17 @@ WITH
     check_i1001 AS (
         SELECT
             i.oid AS object_id,
-            i.formatted_class_name AS object_name,
+            i.formatted_index_full_name AS object_name,
             ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', i.oid,
-                'object_name', i.formatted_class_name,
+                'object_name', i.formatted_index_full_name,
                 'object_type', ch.object_type,
-                'relation_name', t.formatted_class_name,
-                'similar_index_name', si.formatted_class_name,
+                'relation_name', t.formatted_class_full_name,
+                'similar_index_name', si.formatted_index_full_name,
                 'object_definition', i.object_definition,
                 'simplified_object_definition', i.simplified_object_definition,
                 'similar_index_definition', si.object_definition,
@@ -590,16 +626,16 @@ WITH
     check_i1002 AS (
         SELECT
             i.oid AS object_id,
-            i.formatted_class_name AS object_name,
+            i.formatted_index_full_name AS object_name,
             ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', i.oid,
-                'object_name', i.formatted_class_name,
+                'object_name', i.formatted_index_full_name,
                 'object_type', ch.object_type,
-                'relation_name', t.formatted_class_name,
+                'relation_name', t.formatted_class_full_name,
                 'bad_signs', ibs.bad_signs,
                 'check', ch.*
             ) AS check_result_json
@@ -614,17 +650,17 @@ WITH
     check_i1003 AS (
         SELECT
             ui.oid AS object_id,
-            ui.formatted_class_name AS object_name,
+            ui.formatted_index_full_name AS object_name,
             ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', ui.oid,
-                'object_name', ui.formatted_class_name,
+                'object_name', ui.formatted_index_full_name,
                 'object_type', ch.object_type,
-                'relation_name', t.formatted_class_name,
-                'similar_index_name', nui.formatted_class_name,
+                'relation_name', t.formatted_class_full_name,
+                'similar_index_name', nui.formatted_index_full_name,
                 'object_definition', ui.object_definition,
                 'simplified_object_definition', ui.simplified_object_definition,
                 'similar_index_definition', nui.object_definition,
@@ -660,17 +696,17 @@ WITH
     check_i1005 AS (
         SELECT
             i.oid AS object_id,
-            i.formatted_class_name AS object_name,
+            i.formatted_index_full_name AS object_name,
             ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', i.oid,
-                'object_name', i.formatted_class_name,
+                'object_name', i.formatted_index_full_name,
                 'object_type', ch.object_type,
-                'relation_name', t.formatted_class_name,
-                'similar_index_name', si.formatted_class_name,
+                'relation_name', t.formatted_class_full_name,
+                'similar_index_name', si.formatted_index_full_name,
                 'object_definition', i.object_definition,
                 'simplified_object_definition_roughly', i.simplified_object_definition_roughly,
                 'similar_index_definition', si.object_definition,
@@ -691,16 +727,16 @@ WITH
     check_i1010 AS (
         SELECT
             i.oid AS object_id,
-            i.formatted_class_name AS object_name,
+            i.formatted_index_full_name AS object_name,
             ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', i.oid,
-                'object_name', i.formatted_class_name,
+                'object_name', i.formatted_index_full_name,
                 'object_type', ch.object_type,
-                'relation_name', t.formatted_class_name,
+                'relation_name', t.formatted_class_full_name,
                 'check', ch.*
             ) AS check_result_json
         FROM filtered_index_list AS i
@@ -728,20 +764,20 @@ WITH
         FROM pg_catalog.pg_sequence AS s
             INNER JOIN filtered_class_list sc ON s.seqrelid = sc.oid
             LEFT JOIN pg_catalog.pg_sequences sv
-                ON concat(format('%I', sv.schemaname), '.', format('%I', sv.sequencename)) = sc.formatted_class_name
+                ON concat(format('%I', sv.schemaname), '.', format('%I', sv.sequencename)) = sc.formatted_class_full_name
     ),
     -- s1010 - less 5% unused sequence values
     check_s1010 AS (
         SELECT
             s.oid AS object_id,
-            s.formatted_class_name AS object_name,
+            s.formatted_class_full_name AS object_name,
             ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', s.oid,
-                'object_name', s.formatted_class_name,
+                'object_name', s.formatted_class_full_name,
                 'object_type', ch.object_type,
                 'unused_values_percent', s.unused_values_percent,
                 'check', ch.*
@@ -757,14 +793,14 @@ WITH
     check_s1011 AS (
         SELECT
             s.oid AS object_id,
-            s.formatted_class_name AS object_name,
+            s.formatted_class_full_name AS object_name,
             ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', s.oid,
-                'object_name', s.formatted_class_name,
+                'object_name', s.formatted_class_full_name,
                 'object_type', ch.object_type,
                 'unused_values_percent', s.unused_values_percent,
                 'check', ch.*
@@ -782,14 +818,14 @@ WITH
     check_s1012 AS (
         SELECT
             s.oid AS object_id,
-            s.formatted_class_name AS object_name,
+            s.formatted_class_full_name AS object_name,
             ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
                 'object_id', s.oid,
-                'object_name', s.formatted_class_name,
+                'object_name', s.formatted_class_full_name,
                 'object_type', ch.object_type,
                 'unused_values_percent', s.unused_values_percent,
                 'check', ch.*
@@ -804,13 +840,6 @@ WITH
             AND NOT ((SELECT enable_check_s1010 FROM conf) AND (s.oid IN (SELECT object_id FROM check_s1010)))
             AND NOT ((SELECT enable_check_s1011 FROM conf) AND (s.oid IN (SELECT object_id FROM check_s1011)))
     ),
-    -- filtered schema list with simplified name
-    filtered_schema_list_simplified_name AS (
-        SELECT
-            fsl.*,
-            lower(regexp_replace(fsl.nspname, '\s+', '', 'g')) AS simplified_schema_name
-        FROM filtered_schema_list AS fsl
-    ),
     -- n1001 - confusion in name of schemas
     check_n1001 AS (
         SELECT
@@ -824,29 +853,18 @@ WITH
                 'object_id', s1.oid,
                 'object_name', s1.formatted_schema_name,
                 'object_type', ch.object_type,
-                'simplified_object_name', s1.simplified_schema_name,
+                'simplified_object_name', s1.schema_name_wo_unwanted_characters_lower,
                 'similar_object_name', s2.formatted_schema_name,
                 'similar_object_id', s2.oid,
                 'check', ch.*
             ) AS check_result_json
-        FROM filtered_schema_list_simplified_name AS s1
-            INNER JOIN filtered_schema_list_simplified_name AS s2
-                ON s1.simplified_schema_name = s2.simplified_schema_name AND s1.oid < s2.oid
+        FROM filtered_schema_list AS s1
+            INNER JOIN filtered_schema_list AS s2
+                ON s1.schema_name_wo_unwanted_characters_lower = s2.schema_name_wo_unwanted_characters_lower
+                       AND s1.oid < s2.oid
             LEFT JOIN check_list ch ON ch.check_code = 'n1001'
         WHERE
             (SELECT enable_check_n1001 FROM conf)
-    ),
-    --
-    filtered_attribute_list_simplified_name AS (
-        SELECT
-            a.*,
-            fcl.formatted_class_name,
-            concat(fcl.formatted_class_name, '.',  format('%I', a.attname)) AS formatted_attribute_name,
-            lower(regexp_replace(a.attname, '\s+', '', 'g')) AS simplified_attribute_name
-        FROM pg_catalog.pg_attribute AS a
-            INNER JOIN filtered_class_list AS fcl ON a.attrelid = fcl.oid
-        WHERE
-            a.attnum >= 1 AND fcl.relkind IN ('r', 'v', 'm', 'p')
     ),
     -- n1005 - confusion in name of relation attributes
     check_n1005 AS (
@@ -861,55 +879,107 @@ WITH
                 'object_id', a1.attnum,
                 'object_name', a1.formatted_attribute_name,
                 'object_type', ch.object_type,
-                'simplified_object_name', a1.simplified_attribute_name,
+                'simplified_object_name', a1.attribute_name_wo_unwanted_characters_lower,
                 'similar_object_name', a2.formatted_attribute_name,
                 'similar_object_id', a2.attnum,
-                'relation_name', a1.formatted_class_name,
+                'relation_name', fcl.formatted_class_full_name,
                 'relation_id', a1.attrelid,
                 'check', ch.*
             ) AS check_result_json
-        FROM filtered_attribute_list_simplified_name AS a1
-            INNER JOIN filtered_attribute_list_simplified_name AS a2
-                ON a1.simplified_attribute_name = a2.simplified_attribute_name AND a1.attrelid = a2.attrelid
-                    AND a1.attnum < a2.attnum
+        FROM filtered_attribute_list AS a1
+            INNER JOIN filtered_attribute_list AS a2
+                ON a1.attribute_name_wo_unwanted_characters_lower = a2.attribute_name_wo_unwanted_characters_lower
+                       AND a1.attrelid = a2.attrelid AND a1.attnum < a2.attnum
+            INNER JOIN filtered_class_list AS fcl ON a1.attrelid = fcl.oid AND fcl.relkind IN ('r', 'v', 'm', 'p')
             LEFT JOIN check_list ch ON ch.check_code = 'n1005'
         WHERE
             (SELECT enable_check_n1005 FROM conf)
     ),
-    --
-    filtered_class_list_simplified_name AS (
-        SELECT
-            fcl.*,
-            lower(regexp_replace(fcl.relname, '\s+', '', 'g')) AS simplified_class_name
-        FROM filtered_class_list AS fcl
-    ),
     -- n1010 - confusion in name of relations
     check_n1010 AS (
         SELECT
-            fclsn1.oid AS object_id,
-            fclsn1.formatted_class_name AS object_name,
+            fcl1.oid AS object_id,
+            fcl1.formatted_class_full_name AS object_name,
             ch.object_type AS object_type,
             ch.check_code,
             ch.check_level,
             ch.check_name,
             json_build_object(
-                'object_id', fclsn1.oid,
-                'object_name', fclsn1.formatted_class_name,
+                'object_id', fcl1.oid,
+                'object_name', fcl1.formatted_class_full_name,
                 'object_type', ch.object_type,
-                'simplified_object_name', fclsn1.simplified_class_name,
-                'similar_object_name', fclsn2.formatted_class_name,
-                'similar_object_id', fclsn2.oid,
+                'simplified_object_name', fcl1.class_name_wo_unwanted_characters_lower,
+                'similar_object_name', fcl2.formatted_class_full_name,
+                'similar_object_id', fcl2.oid,
                 'check', ch.*
             ) AS check_result_json
-        FROM filtered_class_list_simplified_name AS fclsn1
-            INNER JOIN filtered_class_list_simplified_name AS fclsn2
-                ON fclsn1.relnamespace = fclsn2.relnamespace AND fclsn1.oid < fclsn2.oid
-                    AND fclsn1.simplified_class_name = fclsn2.simplified_class_name
+        FROM filtered_class_list AS fcl1
+            INNER JOIN filtered_class_list AS fcl2
+                ON fcl1.relnamespace = fcl2.relnamespace AND fcl1.oid < fcl2.oid
+                    AND fcl1.class_name_wo_unwanted_characters_lower = fcl2.class_name_wo_unwanted_characters_lower
             LEFT JOIN check_list ch ON ch.check_code = 'n1010'
         WHERE
             (SELECT enable_check_n1010 FROM conf)
-            AND fclsn1.relkind IN ('r', 'v', 'm', 'p')
-            AND fclsn2.relkind IN ('r', 'v', 'm', 'p')
+            AND fcl1.relkind IN ('r', 'v', 'm', 'p')
+            AND fcl2.relkind IN ('r', 'v', 'm', 'p')
+    ),
+    -- n1015 - confusion in name of indexes
+    check_n1015 AS (
+        SELECT
+            i1.oid AS object_id,
+            i1.formatted_index_full_name AS object_name,
+            ch.object_type AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', i1.oid,
+                'object_name', i1.formatted_index_full_name,
+                'object_type', ch.object_type,
+                'relation_name', fcl.formatted_class_full_name,
+                'similar_index_name', i2.formatted_index_full_name,
+                'object_definition', i1.object_definition,
+                'simplified_object_definition', i1.simplified_object_definition,
+                'similar_index_definition', i2.object_definition,
+                'index_used_in_constraint', i1.used_in_constraint,
+                'similar_index_used_in_constraint', i2.used_in_constraint,
+                'check', ch.*
+            ) AS check_result_json
+        FROM filtered_index_list AS i1
+            INNER JOIN filtered_index_list AS i2 ON i1.oid < i2.oid AND i1.indrelid = i2.indrelid
+                AND i1.index_name_wo_unwanted_characters_lower = i2.index_name_wo_unwanted_characters_lower
+            INNER JOIN filtered_class_list AS fcl ON i1.indrelid = fcl.oid
+            LEFT JOIN check_list ch ON ch.check_code = 'n1015'
+        WHERE
+            (SELECT enable_check_n1015 FROM conf)
+    ),
+    -- n1020 - confusion in name of sequences
+    check_n1020 AS (
+        SELECT
+            fcl1.oid AS object_id,
+            fcl1.formatted_class_full_name AS object_name,
+            ch.object_type AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', fcl1.oid,
+                'object_name', fcl1.formatted_class_full_name,
+                'object_type', ch.object_type,
+                'simplified_object_name', fcl1.class_name_wo_unwanted_characters_lower,
+                'similar_object_name', fcl2.formatted_class_full_name,
+                'similar_object_id', fcl2.oid,
+                'check', ch.*
+            ) AS check_result_json
+        FROM filtered_class_list AS fcl1
+            INNER JOIN filtered_class_list AS fcl2
+                ON fcl1.relnamespace = fcl2.relnamespace AND fcl1.oid < fcl2.oid
+                    AND fcl1.class_name_wo_unwanted_characters_lower = fcl2.class_name_wo_unwanted_characters_lower
+            LEFT JOIN check_list ch ON ch.check_code = 'n1020'
+        WHERE
+            (SELECT enable_check_n1020 FROM conf)
+            AND fcl1.relkind IN ('S')
+            AND fcl2.relkind IN ('S')
     )
 -- result
 SELECT object_id, object_name, object_type, check_code, check_level, check_name, check_result_json FROM (
@@ -950,6 +1020,10 @@ SELECT object_id, object_name, object_type, check_code, check_level, check_name,
     SELECT * FROM check_n1005  -- n1005 - confusion in name of relation attributes
     UNION ALL
     SELECT * FROM check_n1010  -- n1010 - confusion in name of relations
+    UNION ALL
+    SELECT * FROM check_n1015  -- n1015 - confusion in name of indexes
+    UNION ALL
+    SELECT * FROM check_n1020  -- n1020 - confusion in name of sequences
 ) AS t
 -- result filter (for error suppression)
 -- >>> WHERE

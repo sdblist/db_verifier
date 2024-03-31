@@ -36,6 +36,8 @@ The current version is applicable to PostgreSQL 12 and later. Tested in versions
 | n1001  |             | confusion in name of schemas             | warning  | enable        | There may be confusion in the name of the schemas. The names are dangerously similar.                      |
 | n1005  |             | confusion in name of relation attributes | warning  | enable        | There may be confusion in the name of the relation attributes. The names are dangerously similar.          |
 | n1010  |             | confusion in name of relations           | warning  | enable        | There may be confusion in the name of the relations in the same schema. The names are dangerously similar. |
+| n1015  |             | confusion in name of indexes             | warning  | enable        | There may be confusion in the name of the relation indexes. The names are dangerously similar.             |
+| n1020  |             | confusion in name of sequences           | warning  | enable        | There may be confusion in the name of the sequences in the same schema. The names are dangerously similar. |                                   |
 
 
 ## Usage example
