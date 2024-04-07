@@ -297,6 +297,7 @@ WITH
         SELECT
             c.oid,
             format('%I', c.conname) AS formatted_constraint_name,
+            c.confmatchtype,
             c.conrelid,
             c.confrelid,
             c.conkey,
@@ -312,6 +313,7 @@ WITH
         SELECT
             cfk.oid,
             cfk.formatted_constraint_name,
+            cfk.confmatchtype,
             cfk.conrelid,
             cfk.confrelid,
             cfk_conkey.conkey_order AS att_order,
@@ -401,6 +403,7 @@ WITH
             FROM filtered_fk_list_attribute
             WHERE
                 (NOT rel_att_notnull)
+                AND confmatchtype NOT IN ('f')
             GROUP BY 1, 2, 3, 4
         ) AS c
             INNER JOIN filtered_class_list AS t
