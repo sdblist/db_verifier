@@ -202,9 +202,24 @@ WITH
                 AS attribute_name_wo_unwanted_characters,
             lower(regexp_replace(a.attname, (SELECT unwanted_characters FROM conf)::text, '', 'g'))
                 AS attribute_name_wo_unwanted_characters_lower,
-            fcl.formatted_class_full_name
+            fcl.formatted_class_full_name,
+            format('%I', t.typname) AS formatted_attribute_type_name,
+            CASE
+                WHEN a.atttypid IN (1560, 1562)
+                    THEN concat(t.typname, '(', a.atttypmod, ')')
+                WHEN a.atttypmod > 4 and a.atttypid IN (1042, 1043)
+                    THEN concat(t.typname, '(', (a.atttypmod - 4), ')')
+                WHEN a.atttypmod >= 4 and a.atttypid IN (1700)
+                    THEN concat(t.typname, '(',
+                        mod((a.atttypmod >> 16), 2^16), ',',
+                        mod(a.atttypmod - 4, 2^16), ')')
+                WHEN a.atttypid IN (1042, 1043, 1700) THEN t.typname
+                WHEN a.atttypmod = -1 THEN format('%I', t.typname)
+                ELSE format('%I', t.typname)
+            END AS formatted_attribute_type_name2
         FROM pg_catalog.pg_attribute AS a
             INNER JOIN filtered_class_list AS fcl ON a.attrelid = fcl.oid
+            INNER JOIN pg_catalog.pg_type AS t ON a.atttypid = t.oid
         WHERE
             a.attnum >= 1
     ),
@@ -320,10 +335,14 @@ WITH
             cfk_conkey.conkey_number,
             cfk_confkey.confkey_number,
             rel_att.attname AS rel_att_name,
+            rel_att.formatted_attribute_name AS rel_att_formatted_name,
+            rel_att.formatted_attribute_type_name2 AS rel_att_formatted_type_name2,
             rel_att.atttypid AS rel_att_type_id,
             rel_att.atttypmod AS rel_att_type_mod,
             rel_att.attnotnull AS rel_att_notnull,
             frel_att.attname AS frel_att_name,
+            frel_att.formatted_attribute_name AS frel_att_formatted_name,
+            frel_att.formatted_attribute_type_name2 AS frel_att_formatted_type_name2,
             frel_att.atttypid AS frel_att_type_id,
             frel_att.atttypmod AS frel_att_type_mod,
             frel_att.attnotnull AS frel_att_notnull
@@ -351,8 +370,10 @@ WITH
                 'object_type', ch.object_type,
                 'relation_name', t.formatted_class_full_name,
                 'relation_att_names', c.rel_att_names,
+                'relation_att_type_names', c.rel_att_type_names,
                 'foreign_relation_name', tf.formatted_class_full_name,
                 'foreign_relation_att_names', c.frel_att_names,
+                'foreign_relation_att_type_names', c.frel_att_type_names,
                 'check', ch.*
             ) AS check_result_json
         FROM (
@@ -361,8 +382,10 @@ WITH
                 formatted_constraint_name,
                 conrelid,
                 confrelid,
-                array_agg (rel_att_name order by att_order ) as rel_att_names,
-                array_agg (frel_att_name order by att_order ) as frel_att_names
+                array_agg (rel_att_name order by att_order) as rel_att_names,
+                array_agg (rel_att_formatted_type_name2 order by att_order) as rel_att_type_names,
+                array_agg (frel_att_name order by att_order) as frel_att_names,
+                array_agg (frel_att_formatted_type_name2 order by att_order) as frel_att_type_names
             FROM filtered_fk_list_attribute
             WHERE
                 ((rel_att_type_id <> frel_att_type_id) OR (rel_att_type_mod <> frel_att_type_mod))
