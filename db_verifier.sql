@@ -211,8 +211,8 @@ WITH
                     THEN concat(t.typname, '(', (a.atttypmod - 4), ')')
                 WHEN a.atttypmod >= 4 and a.atttypid IN (1700)
                     THEN concat(t.typname, '(',
-                        mod((a.atttypmod >> 16), 2^16), ',',
-                        mod(a.atttypmod - 4, 2^16), ')')
+                        mod((a.atttypmod >> 16), 65536), ',',
+                        mod(a.atttypmod - 4, 65536), ')')
                 WHEN a.atttypid IN (1042, 1043, 1700) THEN t.typname
                 WHEN a.atttypmod = -1 THEN format('%I', t.typname)
                 ELSE format('%I', t.typname)
