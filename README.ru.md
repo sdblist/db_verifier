@@ -37,6 +37,7 @@
 | n1010  |             | confusion in name of relations           | warning  | enable        | Возможна путаница в наименованиях отношений в одной схеме. Наименования опасно похожи.                                               |
 | n1015  |             | confusion in name of indexes             | warning  | enable        | Возможна путаница в наименованиях индексов. Наименования опасно похожи.                                                              |
 | n1020  |             | confusion in name of sequences           | warning  | enable        | Возможна путаница в наименованиях последовательностей в одной схеме. Наименования опасно похожи.                                     |
+| sm0001 |             | invalid attribute type for uuid          | notice   | disable       | Поле, вероятно, содержит данные в формате uuid/guid, но используется другой тип данных.                                              |
 
 
 

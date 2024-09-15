@@ -24,6 +24,7 @@ WITH
             true  AS enable_check_n1010,     -- [warning] confusion in name of relations
             true  AS enable_check_n1015,     -- [warning] confusion in name of indexes
             true  AS enable_check_n1020,     -- [warning] confusion in name of sequences
+            false AS enable_smart_sm0001,    -- [notice] invalid attribute type for uuid
             --
             '[\s+.]' AS unwanted_characters  -- unwanted characters in object names
     ),
@@ -84,7 +85,8 @@ WITH
                 ('n1005',      null, 'confusion in name of relation attributes', 'warning', 'attribute'),
                 ('n1010',      null, 'confusion in name of relations', 'warning', 'relation'),
                 ('n1015',      null, 'confusion in name of indexes', 'warning', 'index'),
-                ('n1020',      null, 'confusion in name of sequences', 'warning', 'sequence')
+                ('n1020',      null, 'confusion in name of sequences', 'warning', 'sequence'),
+                ('sm0001',     null, 'invalid attribute type for uuid', 'notice', 'attribute')
             ) AS t(check_code, parent_check_code, check_name, check_level, object_type)
             INNER JOIN check_level_list AS cll ON cll.check_level = t.check_level
             INNER JOIN object_type_list AS otl ON otl.object_type = t.object_type
@@ -138,7 +140,9 @@ WITH
                 ('n1015',  null, 'There may be confusion in the name of the relation indexes. The names are dangerously similar.'),
                 ('n1015',  'ru', 'Возможна путаница в наименованиях индексов. Наименования опасно похожи.'),
                 ('n1020',  null, 'There may be confusion in the name of the sequences in the same schema. The names are dangerously similar.'),
-                ('n1020',  'ru', 'Возможна путаница в наименованиях последовательностей в одной схеме. Наименования опасно похожи.')
+                ('n1020',  'ru', 'Возможна путаница в наименованиях последовательностей в одной схеме. Наименования опасно похожи.'),
+                ('sm0001', null, 'The field probably contains data in uuid/guid format, but a different data type is used.'),
+                ('sm0001', 'ru', 'Поле, вероятно, содержит данные в формате uuid/guid, но используется другой тип данных.')
             ) AS t(description_check_code, description_language_code, description_value)
         WHERE
             description_language_code IS NULL
@@ -1006,6 +1010,33 @@ WITH
             (SELECT enable_check_n1020 FROM conf)
             AND fcl1.relkind IN ('S')
             AND fcl2.relkind IN ('S')
+    ),
+    -- sm0001 - invalid attribute type for uuid
+    check_sm0001 AS (
+        SELECT
+            a.attnum AS object_id,
+            a.formatted_attribute_full_name AS object_name,
+            ch.object_type AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', a.attnum,
+                'object_name', a.formatted_attribute_full_name,
+                'object_type', ch.object_type,
+                'attribute_type_name', a.formatted_attribute_type_name2,
+                'relation_id', a.attrelid,
+                'relation_name', a.formatted_class_full_name,
+                'check', ch.*
+            ) AS check_result_json
+        FROM filtered_attribute_list AS a
+            LEFT JOIN check_list ch ON ch.check_code = 'sm0001'
+        WHERE
+            (SELECT enable_smart_sm0001 FROM conf)
+            AND (
+                (a.atttypid IN (1042, 1043) AND ((a.atttypmod - 4) IN (32, 36) )
+                    AND (a.attname ILIKE '%uid%' OR a.attname ILIKE '%\_id%'))
+            )
     )
 -- result
 SELECT object_id, object_name, object_type, check_code, check_level, check_name, check_result_json FROM (
@@ -1050,6 +1081,8 @@ SELECT object_id, object_name, object_type, check_code, check_level, check_name,
     SELECT * FROM check_n1015  -- n1015 - confusion in name of indexes
     UNION ALL
     SELECT * FROM check_n1020  -- n1020 - confusion in name of sequences
+    UNION ALL
+    SELECT * FROM check_sm0001 -- sm0001 - invalid attribute type for uuid
 ) AS t
 -- result filter (for error suppression)
 -- >>> WHERE
