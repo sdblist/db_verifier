@@ -3,27 +3,29 @@ WITH
     conf AS (
         SELECT
             'ru'  AS conf_language_code,     -- null or value like 'en', 'ru' (see check_description)
-            true  AS enable_check_no1001,    -- [error] check no unique key
-            true  AS enable_check_no1002,    -- [error] check no primary key constraint
+            true  AS enable_check_c1001,     -- [warning] constraint not validated
             true  AS enable_check_fk1001,    -- [error] check fk uses mismatched types
             false AS enable_check_fk1002,    -- [warning] check fk uses nullable columns
             false AS enable_check_fk1007,    -- [notice] not involved in foreign keys
             true  AS enable_check_fk1010,    -- [warning] similar FK
             true  AS enable_check_fk1011,    -- [warning] FK have common attributes
-            true  AS enable_check_c1001,     -- [warning] constraint not validated
             true  AS enable_check_i1001,     -- [warning] similar indexes
             true  AS enable_check_i1002,     -- [error] index has bad signs
             true  AS enable_check_i1003,     -- [warning] similar indexes unique and not unique
             false AS enable_check_i1005,     -- [notice] similar indexes (roughly)
             true  AS enable_check_i1010,     -- [notice] b-tree index for array column
-            true  AS enable_check_s1010,     -- [critical] less 5% unused sequence values
-            true  AS enable_check_s1011,     -- [error] less 10% unused sequence values
-            true  AS enable_check_s1012,     -- [warning] less 20% unused sequence values
             true  AS enable_check_n1001,     -- [warning] confusion in name of schemas
             true  AS enable_check_n1005,     -- [warning] confusion in name of relation attributes
             true  AS enable_check_n1010,     -- [warning] confusion in name of relations
             true  AS enable_check_n1015,     -- [warning] confusion in name of indexes
             true  AS enable_check_n1020,     -- [warning] confusion in name of sequences
+            true  AS enable_check_no1001,    -- [error] check no unique key
+            true  AS enable_check_no1002,    -- [error] check no primary key constraint
+            true  AS enable_check_r1001,     -- [warning] unlogged table
+            true  AS enable_check_s1001,     -- [warning] unlogged sequence
+            true  AS enable_check_s1010,     -- [critical] less 5% unused sequence values
+            true  AS enable_check_s1011,     -- [error] less 10% unused sequence values
+            true  AS enable_check_s1012,     -- [warning] less 20% unused sequence values
             false AS enable_smart_sm0001,    -- [notice] invalid attribute type for uuid
             --
             '[\s+.]' AS unwanted_characters  -- unwanted characters in object names
@@ -78,6 +80,7 @@ WITH
                 ('i1003',      null, 'similar indexes unique and not unique', 'warning', 'index'),
                 ('i1005',      null, 'similar indexes (roughly)', 'notice', 'index'),
                 ('i1010',      null, 'b-tree index for array column', 'notice', 'index'),
+                ('s1001',      null, 'unlogged sequence', 'warning', 'sequence'),
                 ('s1010',      null, 'less 5% unused sequence values', 'critical', 'sequence'),
                 ('s1011',   's1010', 'less 10% unused sequence values', 'error', 'sequence'),
                 ('s1012',   's1011', 'less 20% unused sequence values', 'warning', 'sequence'),
@@ -86,6 +89,7 @@ WITH
                 ('n1010',      null, 'confusion in name of relations', 'warning', 'relation'),
                 ('n1015',      null, 'confusion in name of indexes', 'warning', 'index'),
                 ('n1020',      null, 'confusion in name of sequences', 'warning', 'sequence'),
+                ('r1001',      null, 'unlogged table', 'warning', 'relation'),
                 ('sm0001',     null, 'invalid attribute type for uuid', 'notice', 'attribute')
             ) AS t(check_code, parent_check_code, check_name, check_level, object_type)
             INNER JOIN check_level_list AS cll ON cll.check_level = t.check_level
@@ -125,6 +129,8 @@ WITH
                 ('i1005',  'ru', 'Индексы похожи по набору полей (грубое сравнение).'),
                 ('i1010',  null, 'B-tree index for array column.'),
                 ('i1010',  'ru', 'B-tree индекс на поле с массивом значений, не индексирует элементы массива (возможно нужен GIN индекс).'),
+                ('s1001',  null, 'Unlogged sequence is not replicated, reset after crash.'),
+                ('s1001',  'ru', 'Нежурналируемая последовательность не реплицируется, сбрасывается при сбоях.'),
                 ('s1010',  null, 'The sequence has less than 5% unused values left.'),
                 ('s1010',  'ru', 'У последовательности осталось менее 5% неиспользованных значений.'),
                 ('s1011',  null, 'The sequence has less than 10% unused values left.'),
@@ -141,6 +147,8 @@ WITH
                 ('n1015',  'ru', 'Возможна путаница в наименованиях индексов. Наименования опасно похожи.'),
                 ('n1020',  null, 'There may be confusion in the name of the sequences in the same schema. The names are dangerously similar.'),
                 ('n1020',  'ru', 'Возможна путаница в наименованиях последовательностей в одной схеме. Наименования опасно похожи.'),
+                ('r1001',  null, 'Unlogged table is not replicated, truncated after crash.'),
+                ('r1001',  'ru', 'Нежурналируемая таблица не реплицируется, очищается при сбоях.'),
                 ('sm0001', null, 'The field probably contains data in uuid/guid format, but a different data type is used.'),
                 ('sm0001', 'ru', 'Поле, вероятно, содержит данные в формате uuid/guid, но используется другой тип данных.')
             ) AS t(description_check_code, description_language_code, description_value)
@@ -796,6 +804,28 @@ WITH
             LEFT JOIN pg_catalog.pg_sequences sv
                 ON concat(format('%I', sv.schemaname), '.', format('%I', sv.sequencename)) = sc.formatted_class_full_name
     ),
+    -- s1001 - unlogged sequence
+    check_s1001 AS (
+        SELECT
+            t.oid AS object_id,
+            t.formatted_class_full_name AS object_name,
+            ch.object_type AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', t.oid,
+                'object_name', t.formatted_class_full_name,
+                'object_type', ch.object_type,
+                'check', ch.*
+            ) AS check_result_json
+        FROM filtered_class_list AS t
+            LEFT JOIN check_list ch ON ch.check_code = 's1001'
+        WHERE
+            (SELECT enable_check_s1001 FROM conf)
+            AND t.relkind IN ('S')
+            AND t.relpersistence = 'u'
+    ),
     -- s1010 - less 5% unused sequence values
     check_s1010 AS (
         SELECT
@@ -1011,6 +1041,28 @@ WITH
             AND fcl1.relkind IN ('S')
             AND fcl2.relkind IN ('S')
     ),
+    -- r1001 - unlogged table
+    check_r1001 AS (
+        SELECT
+            t.oid AS object_id,
+            t.formatted_class_full_name AS object_name,
+            ch.object_type AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', t.oid,
+                'object_name', t.formatted_class_full_name,
+                'object_type', ch.object_type,
+                'check', ch.*
+            ) AS check_result_json
+        FROM filtered_class_list AS t
+            LEFT JOIN check_list ch ON ch.check_code = 'r1001'
+        WHERE
+            (SELECT enable_check_r1001 FROM conf)
+            AND t.relkind IN ('r', 'p')
+            AND t.relpersistence = 'u'
+    ),
     -- sm0001 - invalid attribute type for uuid
     check_sm0001 AS (
         SELECT
@@ -1040,9 +1092,7 @@ WITH
     )
 -- result
 SELECT object_id, object_name, object_type, check_code, check_level, check_name, check_result_json FROM (
-    SELECT * FROM check_no1001 -- no1001 - no unique key
-    UNION ALL
-    SELECT * FROM check_no1002 -- no1002 - no primary key constraint
+    SELECT * FROM check_c1001  -- c1001 - constraint not validated
     UNION ALL
     SELECT * FROM check_fk1001 -- fk1001 - fk uses mismatched types
     UNION ALL
@@ -1054,8 +1104,6 @@ SELECT object_id, object_name, object_type, check_code, check_level, check_name,
     UNION ALL
     SELECT * FROM check_fk1011 -- fk1011 - FK have common attributes
     UNION ALL
-    SELECT * FROM check_c1001  -- c1001 - constraint not validated
-    UNION ALL
     SELECT * FROM check_i1001  -- i1001 - similar indexes
     UNION ALL
     SELECT * FROM check_i1002  -- i1002 - index has bad signs
@@ -1066,12 +1114,6 @@ SELECT object_id, object_name, object_type, check_code, check_level, check_name,
     UNION ALL
     SELECT * FROM check_i1010  -- i1010 - b-tree index for array column
     UNION ALL
-    SELECT * FROM check_s1010  -- s1010 - less 5% unused sequence values
-    UNION ALL
-    SELECT * FROM check_s1011  -- s1011 - less 10% unused sequence values
-    UNION ALL
-    SELECT * FROM check_s1012  -- s1012 - less 20% unused sequence values
-    UNION ALL
     SELECT * FROM check_n1001  -- n1001 - confusion in name of schemas
     UNION ALL
     SELECT * FROM check_n1005  -- n1005 - confusion in name of relation attributes
@@ -1081,6 +1123,20 @@ SELECT object_id, object_name, object_type, check_code, check_level, check_name,
     SELECT * FROM check_n1015  -- n1015 - confusion in name of indexes
     UNION ALL
     SELECT * FROM check_n1020  -- n1020 - confusion in name of sequences
+    UNION ALL
+    SELECT * FROM check_no1001 -- no1001 - no unique key
+    UNION ALL
+    SELECT * FROM check_no1002 -- no1002 - no primary key constraint
+    UNION ALL
+    SELECT * FROM check_r1001  -- s1001 - unlogged table
+    UNION ALL
+    SELECT * FROM check_s1001  -- s1001 - unlogged sequence
+    UNION ALL
+    SELECT * FROM check_s1010  -- s1010 - less 5% unused sequence values
+    UNION ALL
+    SELECT * FROM check_s1011  -- s1011 - less 10% unused sequence values
+    UNION ALL
+    SELECT * FROM check_s1012  -- s1012 - less 20% unused sequence values
     UNION ALL
     SELECT * FROM check_sm0001 -- sm0001 - invalid attribute type for uuid
 ) AS t

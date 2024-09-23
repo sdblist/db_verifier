@@ -15,30 +15,32 @@ The current version is applicable to PostgreSQL 12 and later. Tested in versions
 
 ## Check list
 
-| code   | parent_code | name                                     | level    | default state | description                                                                                                  |
-|:-------|:------------|:-----------------------------------------|:---------|:--------------|:-------------------------------------------------------------------------------------------------------------|
-| no1001 |             | no unique key                            | error    | enable        | Relation has no unique key.                                                                                  |
-| no1002 | no1001      | no primary key constraint                | error    | enable        | Relation has no primary key constraint.                                                                      |                   
-| fk1001 |             | fk uses mismatched types                 | error    | enable        | Foreign key uses columns with mismatched types.                                                              |   
-| fk1002 |             | fk uses nullable columns                 | warning  | disable       | Foreign key uses nullable columns.                                                                           |
-| fk1007 |             | not involved in foreign keys             | notice   | disable       | Relation is not involved in foreign keys.                                                                    |
-| fk1010 |             | similar FK                               | warning  | enable        | FK are very similar.                                                                                         |
-| fk1011 | fk1010      | FK have common attributes                | warning  | enable        | There are multiple FK between relations, FK have common attributes.                                          |
-| c1001  |             | constraint not validated                 | warning  | enable        | Constraint was not validated for all data.                                                                   |
-| i1001  |             | similar indexes                          | warning  | enable        | Indexes are very similar.                                                                                    |
-| i1002  |             | index has bad signs                      | error    | enable        | Index has bad signs.                                                                                         |
-| i1003  |             | similar indexes unique and not unique    | warning  | enable        | Unique and not unique indexes are very similar.                                                              |
-| i1005  |             | similar indexes (roughly)                | notice   | disable       | Indexes are roughly similar.                                                                                 |
-| i1010  |             | b-tree index for array column            | notice   | enable        | B-tree index for array column.                                                                               |
-| s1010  |             | less 5% unused sequence values           | critical | enable        | The sequence has less than 5% unused values left.                                                            |
-| s1011  | s1010       | less 10% unused sequence values          | error    | enable        | The sequence has less than 10% unused values left.                                                           |
-| s1012  | s1011       | less 20% unused sequence values          | warning  | enable        | The sequence has less than 20% unused values left.                                                           |
-| n1001  |             | confusion in name of schemas             | warning  | enable        | There may be confusion in the name of the schemas. The names are dangerously similar.                        |
-| n1005  |             | confusion in name of relation attributes | warning  | enable        | There may be confusion in the name of the relation attributes. The names are dangerously similar.            |
-| n1010  |             | confusion in name of relations           | warning  | enable        | There may be confusion in the name of the relations in the same schema. The names are dangerously similar.   |
-| n1015  |             | confusion in name of indexes             | warning  | enable        | There may be confusion in the name of the relation indexes. The names are dangerously similar.               |
-| n1020  |             | confusion in name of sequences           | warning  | enable        | There may be confusion in the name of the sequences in the same schema. The names are dangerously similar.   |
-| sm0001 |             | invalid attribute type for uuid          | notice   | disable       | The field probably contains data in uuid/guid format, but a different data type is used.                     |
+| code   | parent_code | name                                     | level    | default state | description                                                                                                |
+|:-------|:------------|:-----------------------------------------|:---------|:--------------|:-----------------------------------------------------------------------------------------------------------|
+| c1001  |             | constraint not validated                 | warning  | enable        | Constraint was not validated for all data.                                                                 |
+| fk1001 |             | fk uses mismatched types                 | error    | enable        | Foreign key uses columns with mismatched types.                                                            |   
+| fk1002 |             | fk uses nullable columns                 | warning  | disable       | Foreign key uses nullable columns.                                                                         |
+| fk1007 |             | not involved in foreign keys             | notice   | disable       | Relation is not involved in foreign keys.                                                                  |
+| fk1010 |             | similar FK                               | warning  | enable        | FK are very similar.                                                                                       |
+| fk1011 | fk1010      | FK have common attributes                | warning  | enable        | There are multiple FK between relations, FK have common attributes.                                        |
+| i1001  |             | similar indexes                          | warning  | enable        | Indexes are very similar.                                                                                  |
+| i1002  |             | index has bad signs                      | error    | enable        | Index has bad signs.                                                                                       |
+| i1003  |             | similar indexes unique and not unique    | warning  | enable        | Unique and not unique indexes are very similar.                                                            |
+| i1005  |             | similar indexes (roughly)                | notice   | disable       | Indexes are roughly similar.                                                                               |
+| i1010  |             | b-tree index for array column            | notice   | enable        | B-tree index for array column.                                                                             |
+| n1001  |             | confusion in name of schemas             | warning  | enable        | There may be confusion in the name of the schemas. The names are dangerously similar.                      |
+| n1005  |             | confusion in name of relation attributes | warning  | enable        | There may be confusion in the name of the relation attributes. The names are dangerously similar.          |
+| n1010  |             | confusion in name of relations           | warning  | enable        | There may be confusion in the name of the relations in the same schema. The names are dangerously similar. |
+| n1015  |             | confusion in name of indexes             | warning  | enable        | There may be confusion in the name of the relation indexes. The names are dangerously similar.             |
+| n1020  |             | confusion in name of sequences           | warning  | enable        | There may be confusion in the name of the sequences in the same schema. The names are dangerously similar. |
+| no1001 |             | no unique key                            | error    | enable        | Relation has no unique key.                                                                                |
+| no1002 | no1001      | no primary key constraint                | error    | enable        | Relation has no primary key constraint.                                                                    |                   
+| r1001  |             | unlogged table                           | warning  | enable        | Unlogged table is not replicated, truncated after crash.                                                   |
+| s1001  |             | unlogged sequence                        | warning  | enable        | Unlogged sequence is not replicated, reset after crash.                                                    |
+| s1010  |             | less 5% unused sequence values           | critical | enable        | The sequence has less than 5% unused values left.                                                          |
+| s1011  | s1010       | less 10% unused sequence values          | error    | enable        | The sequence has less than 10% unused values left.                                                         |
+| s1012  | s1011       | less 20% unused sequence values          | warning  | enable        | The sequence has less than 20% unused values left.                                                         |
+| sm0001 |             | invalid attribute type for uuid          | notice   | disable       | The field probably contains data in uuid/guid format, but a different data type is used.                   |
 
 
 ## Usage example
