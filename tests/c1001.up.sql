@@ -1,3 +1,5 @@
+-- c1001 - constraint not validated
+
 -- insert invalid data and create not valid constraint
 -- c1001 - no
 DROP TABLE IF EXISTS public.c1001_1 CASCADE;

@@ -1,0 +1,46 @@
+-- n1011 - unwanted characters in relation name
+
+-- "n1011 "  - yes
+DROP TABLE IF EXISTS public."n1011 " CASCADE;
+CREATE TABLE public."n1011 "
+(
+    id integer GENERATED ALWAYS AS IDENTITY NOT NULL PRIMARY KEY
+);
+
+-- "	n1011"  - yes
+DROP TABLE IF EXISTS public."	n1011" CASCADE;
+CREATE TABLE public."	n1011"
+(
+    id integer GENERATED ALWAYS AS IDENTITY NOT NULL PRIMARY KEY
+);
+
+-- "n.1011"  - yes
+DROP TABLE IF EXISTS public."n.1011" CASCADE;
+CREATE TABLE public."n.1011"
+(
+    id integer GENERATED ALWAYS AS IDENTITY NOT NULL PRIMARY KEY
+);
+
+-- "n+1011"  - yes
+DROP TABLE IF EXISTS public."n+1011" CASCADE;
+CREATE TABLE public."n+1011"
+(
+    id integer GENERATED ALWAYS AS IDENTITY NOT NULL PRIMARY KEY
+);
+
+-- "n\n1011" - yes
+DROP TABLE IF EXISTS public."n\n1011" CASCADE;
+CREATE TABLE public."n\n1011"
+(
+    id integer GENERATED ALWAYS AS IDENTITY NOT NULL PRIMARY KEY
+);
+
+-- "n
+-- 1011"     - yes
+DROP TABLE IF EXISTS public."n
+1011" CASCADE;
+CREATE TABLE public."n
+1011"
+(
+    id integer GENERATED ALWAYS AS IDENTITY NOT NULL PRIMARY KEY
+);

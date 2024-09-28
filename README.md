@@ -29,10 +29,15 @@ The current version is applicable to PostgreSQL 12 and later. Tested in versions
 | i1005  |             | similar indexes (roughly)                | notice   | disable       | Indexes are roughly similar.                                                                               |
 | i1010  |             | b-tree index for array column            | notice   | enable        | B-tree index for array column.                                                                             |
 | n1001  |             | confusion in name of schemas             | warning  | enable        | There may be confusion in the name of the schemas. The names are dangerously similar.                      |
+| n1002  |             | unwanted characters in schema name       | notice   | enable        | Schema name contains unwanted characters such as dots, spaces, etc.                                        |
 | n1005  |             | confusion in name of relation attributes | warning  | enable        | There may be confusion in the name of the relation attributes. The names are dangerously similar.          |
+| n1006  |             | unwanted characters in attribute name    | notice   | enable        | Attribute name contains unwanted characters such as dots, spaces, etc.                                     |
 | n1010  |             | confusion in name of relations           | warning  | enable        | There may be confusion in the name of the relations in the same schema. The names are dangerously similar. |
+| n1011  |             | unwanted characters in relation name     | notice   | enable        | Relation name contains unwanted characters such as dots, spaces, etc.                                      |
 | n1015  |             | confusion in name of indexes             | warning  | enable        | There may be confusion in the name of the relation indexes. The names are dangerously similar.             |
+| n1016  |             | unwanted characters in index name        | notice   | enable        | Index name contains unwanted characters such as dots, spaces, etc.                                         |
 | n1020  |             | confusion in name of sequences           | warning  | enable        | There may be confusion in the name of the sequences in the same schema. The names are dangerously similar. |
+| n1021  |             | unwanted characters in sequence name     | notice   | enable        | Sequence name contains unwanted characters such as dots, spaces, etc.                                      |
 | no1001 |             | no unique key                            | error    | enable        | Relation has no unique key.                                                                                |
 | no1002 | no1001      | no primary key constraint                | error    | enable        | Relation has no primary key constraint.                                                                    |                   
 | r1001  |             | unlogged table                           | warning  | enable        | Unlogged table is not replicated, truncated after crash.                                                   |

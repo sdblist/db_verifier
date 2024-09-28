@@ -15,10 +15,15 @@ WITH
             false AS enable_check_i1005,     -- [notice] similar indexes (roughly)
             true  AS enable_check_i1010,     -- [notice] b-tree index for array column
             true  AS enable_check_n1001,     -- [warning] confusion in name of schemas
+            true  AS enable_check_n1002,     -- [notice] unwanted characters in schema name
             true  AS enable_check_n1005,     -- [warning] confusion in name of relation attributes
+            true  AS enable_check_n1006,     -- [notice] unwanted characters in attribute name
             true  AS enable_check_n1010,     -- [warning] confusion in name of relations
+            true  AS enable_check_n1011,     -- [notice] unwanted characters in relation name
             true  AS enable_check_n1015,     -- [warning] confusion in name of indexes
+            true  AS enable_check_n1016,     -- [notice] unwanted characters in index name
             true  AS enable_check_n1020,     -- [warning] confusion in name of sequences
+            true  AS enable_check_n1021,     -- [notice] unwanted characters in sequence name
             true  AS enable_check_no1001,    -- [error] check no unique key
             true  AS enable_check_no1002,    -- [error] check no primary key constraint
             true  AS enable_check_r1001,     -- [warning] unlogged table
@@ -28,7 +33,7 @@ WITH
             true  AS enable_check_s1012,     -- [warning] less 20% unused sequence values
             false AS enable_smart_sm0001,    -- [notice] invalid attribute type for uuid
             --
-            '[\s+.]' AS unwanted_characters  -- unwanted characters in object names
+            '[\s+.\\]' AS unwanted_characters  -- unwanted characters in object names
     ),
     --
     check_level_list AS (
@@ -67,29 +72,34 @@ WITH
             'system catalog' AS check_source_name
         FROM
             (VALUES
-                ('no1001',     null, 'no unique key', 'error', 'relation'),
-                ('no1002', 'no1001', 'no primary key constraint', 'error', 'relation'),
+                ('c1001',      null, 'constraint not validated', 'warning', 'constraint'),
                 ('fk1001',     null, 'fk uses mismatched types', 'error', 'constraint'),
                 ('fk1002',     null, 'fk uses nullable columns', 'warning', 'constraint'),
                 ('fk1007',     null, 'not involved in foreign keys', 'notice', 'relation'),
                 ('fk1010',     null, 'similar FK', 'warning', 'constraint'),
                 ('fk1011', 'fk1010', 'FK have common attributes', 'warning', 'constraint'),
-                ('c1001',      null, 'constraint not validated', 'warning', 'constraint'),
                 ('i1001',      null, 'similar indexes', 'warning', 'index'),
                 ('i1002',      null, 'index has bad signs', 'error', 'index'),
                 ('i1003',      null, 'similar indexes unique and not unique', 'warning', 'index'),
                 ('i1005',      null, 'similar indexes (roughly)', 'notice', 'index'),
                 ('i1010',      null, 'b-tree index for array column', 'notice', 'index'),
+                ('n1001',      null, 'confusion in name of schemas', 'warning', 'schema'),
+                ('n1002',      null, 'unwanted characters in schema name', 'notice', 'schema'),
+                ('n1005',      null, 'confusion in name of relation attributes', 'warning', 'attribute'),
+                ('n1006',      null, 'unwanted characters in attribute name', 'notice', 'attribute'),
+                ('n1010',      null, 'confusion in name of relations', 'warning', 'relation'),
+                ('n1011',      null, 'unwanted characters in relation name', 'notice', 'relation'),
+                ('n1015',      null, 'confusion in name of indexes', 'warning', 'index'),
+                ('n1016',      null, 'unwanted characters in index name', 'notice', 'index'),
+                ('n1020',      null, 'confusion in name of sequences', 'warning', 'sequence'),
+                ('n1021',      null, 'unwanted characters in sequence name', 'notice', 'sequence'),
+                ('no1001',     null, 'no unique key', 'error', 'relation'),
+                ('no1002', 'no1001', 'no primary key constraint', 'error', 'relation'),
+                ('r1001',      null, 'unlogged table', 'warning', 'relation'),
                 ('s1001',      null, 'unlogged sequence', 'warning', 'sequence'),
                 ('s1010',      null, 'less 5% unused sequence values', 'critical', 'sequence'),
                 ('s1011',   's1010', 'less 10% unused sequence values', 'error', 'sequence'),
                 ('s1012',   's1011', 'less 20% unused sequence values', 'warning', 'sequence'),
-                ('n1001',      null, 'confusion in name of schemas', 'warning', 'schema'),
-                ('n1005',      null, 'confusion in name of relation attributes', 'warning', 'attribute'),
-                ('n1010',      null, 'confusion in name of relations', 'warning', 'relation'),
-                ('n1015',      null, 'confusion in name of indexes', 'warning', 'index'),
-                ('n1020',      null, 'confusion in name of sequences', 'warning', 'sequence'),
-                ('r1001',      null, 'unlogged table', 'warning', 'relation'),
                 ('sm0001',     null, 'invalid attribute type for uuid', 'notice', 'attribute')
             ) AS t(check_code, parent_check_code, check_name, check_level, object_type)
             INNER JOIN check_level_list AS cll ON cll.check_level = t.check_level
@@ -103,10 +113,8 @@ WITH
             t.*
         FROM
             (VALUES
-                ('no1001', null, 'Relation has no unique key.'),
-                ('no1001', 'ru', 'У отношения нет уникального ключа (набора полей). Это может создавать проблемы при удалении записей, при логической репликации и др.'),
-                ('no1002', null, 'Relation has no primary key constraint.'),
-                ('no1002', 'ru', 'У отношения нет ограничения primary key.'),
+                ('c1001',  null, 'Constraint was not validated for all data.'),
+                ('c1001',  'ru', 'Ограничение не проверено для всех данных (возможно присутствуют записи, нарушающие ограничение).'),
                 ('fk1001', null, 'Foreign key uses columns with mismatched types.'),
                 ('fk1001', 'ru', 'Внешний ключ использует колонки с несовпадающими типами.'),
                 ('fk1002', null, 'Foreign key uses nullable columns.'),
@@ -117,8 +125,6 @@ WITH
                 ('fk1010', 'ru', 'FK очень похожи (возможно совпадают).'),
                 ('fk1011', null, 'There are multiple FK between relations, FK have common attributes.'),
                 ('fk1011', 'ru', 'Между отношениями несколько FK, FK имеют общие атрибуты.'),
-                ('c1001',  null, 'Constraint was not validated for all data.'),
-                ('c1001',  'ru', 'Ограничение не проверено для всех данных (возможно присутствуют записи, нарушающие ограничение).'),
                 ('i1001',  null, 'Indexes are very similar.'),
                 ('i1001',  'ru', 'Индексы очень похожи (возможно совпадают).'),
                 ('i1002',  null, 'Index has bad signs.'),
@@ -129,6 +135,32 @@ WITH
                 ('i1005',  'ru', 'Индексы похожи по набору полей (грубое сравнение).'),
                 ('i1010',  null, 'B-tree index for array column.'),
                 ('i1010',  'ru', 'B-tree индекс на поле с массивом значений, не индексирует элементы массива (возможно нужен GIN индекс).'),
+                ('n1001',  null, 'There may be confusion in the name of the schemas. The names are dangerously similar.'),
+                ('n1001',  'ru', 'Возможна путаница в наименованиях схем. Наименования опасно похожи.'),
+                ('n1002',  null, 'Schema name contains unwanted characters such as dots, spaces, etc.'),
+                ('n1002',  'ru', 'Имя схемы содержит нежелательные символы, такие как точки, пробелы и др.'),
+                ('n1005',  null, 'There may be confusion in the name of the relation attributes. The names are dangerously similar.'),
+                ('n1005',  'ru', 'Возможна путаница в наименованиях атрибутов отношения (колонок). Наименования опасно похожи.'),
+                ('n1006',  null, 'Attribute name contains unwanted characters such as dots, spaces, etc.'),
+                ('n1006',  'ru', 'Имя атрибута содержит нежелательные символы, такие как точки, пробелы и др.'),
+                ('n1010',  null, 'There may be confusion in the name of the relations in the same schema. The names are dangerously similar.'),
+                ('n1010',  'ru', 'Возможна путаница в наименованиях отношений в одной схеме. Наименования опасно похожи.'),
+                ('n1011',  null, 'Relation name contains unwanted characters such as dots, spaces, etc.'),
+                ('n1011',  'ru', 'Имя отношения содержит нежелательные символы, такие как точки, пробелы и др.'),
+                ('n1015',  null, 'There may be confusion in the name of the relation indexes. The names are dangerously similar.'),
+                ('n1015',  'ru', 'Возможна путаница в наименованиях индексов. Наименования опасно похожи.'),
+                ('n1016',  null, 'Index name contains unwanted characters such as dots, spaces, etc.'),
+                ('n1016',  'ru', 'Имя индекса содержит нежелательные символы, такие как точки, пробелы и др.'),
+                ('n1020',  null, 'There may be confusion in the name of the sequences in the same schema. The names are dangerously similar.'),
+                ('n1020',  'ru', 'Возможна путаница в наименованиях последовательностей в одной схеме. Наименования опасно похожи.'),
+                ('n1021',  null, 'Sequence name contains unwanted characters such as dots, spaces, etc.'),
+                ('n1021',  'ru', 'Имя последовательности содержит нежелательные символы, такие как точки, пробелы и др.'),
+                ('no1001', null, 'Relation has no unique key.'),
+                ('no1001', 'ru', 'У отношения нет уникального ключа (набора полей). Это может создавать проблемы при удалении записей, при логической репликации и др.'),
+                ('no1002', null, 'Relation has no primary key constraint.'),
+                ('no1002', 'ru', 'У отношения нет ограничения primary key.'),
+                ('r1001',  null, 'Unlogged table is not replicated, truncated after crash.'),
+                ('r1001',  'ru', 'Нежурналируемая таблица не реплицируется, очищается при сбоях.'),
                 ('s1001',  null, 'Unlogged sequence is not replicated, reset after crash.'),
                 ('s1001',  'ru', 'Нежурналируемая последовательность не реплицируется, сбрасывается при сбоях.'),
                 ('s1010',  null, 'The sequence has less than 5% unused values left.'),
@@ -137,18 +169,6 @@ WITH
                 ('s1011',  'ru', 'У последовательности осталось менее 10% неиспользованных значений.'),
                 ('s1012',  null, 'The sequence has less than 20% unused values left.'),
                 ('s1012',  'ru', 'У последовательности осталось менее 20% неиспользованных значений.'),
-                ('n1001',  null, 'There may be confusion in the name of the schemas. The names are dangerously similar.'),
-                ('n1001',  'ru', 'Возможна путаница в наименованиях схем. Наименования опасно похожи.'),
-                ('n1005',  null, 'There may be confusion in the name of the relation attributes. The names are dangerously similar.'),
-                ('n1005',  'ru', 'Возможна путаница в наименованиях атрибутов отношения (колонок). Наименования опасно похожи.'),
-                ('n1010',  null, 'There may be confusion in the name of the relations in the same schema. The names are dangerously similar.'),
-                ('n1010',  'ru', 'Возможна путаница в наименованиях отношений в одной схеме. Наименования опасно похожи.'),
-                ('n1015',  null, 'There may be confusion in the name of the relation indexes. The names are dangerously similar.'),
-                ('n1015',  'ru', 'Возможна путаница в наименованиях индексов. Наименования опасно похожи.'),
-                ('n1020',  null, 'There may be confusion in the name of the sequences in the same schema. The names are dangerously similar.'),
-                ('n1020',  'ru', 'Возможна путаница в наименованиях последовательностей в одной схеме. Наименования опасно похожи.'),
-                ('r1001',  null, 'Unlogged table is not replicated, truncated after crash.'),
-                ('r1001',  'ru', 'Нежурналируемая таблица не реплицируется, очищается при сбоях.'),
                 ('sm0001', null, 'The field probably contains data in uuid/guid format, but a different data type is used.'),
                 ('sm0001', 'ru', 'Поле, вероятно, содержит данные в формате uuid/guid, но используется другой тип данных.')
             ) AS t(description_check_code, description_language_code, description_value)
@@ -597,6 +617,7 @@ WITH
             ic.class_name_wo_unwanted_characters_lower AS index_name_wo_unwanted_characters_lower,
             ic.relam,
             ic.relnatts,
+            ic.relname,
             i.*,
             pg_get_indexdef(ic.oid) AS object_definition,
             -- simplification of definition
@@ -926,6 +947,27 @@ WITH
         WHERE
             (SELECT enable_check_n1001 FROM conf)
     ),
+    -- n1002 - unwanted characters in schema name
+    check_n1002 AS (
+        SELECT
+            s.oid AS object_id,
+            s.formatted_schema_name AS object_name,
+            ch.object_type AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', s.oid,
+                'object_name', s.formatted_schema_name,
+                'object_type', ch.object_type,
+                'check', ch.*
+            ) AS check_result_json
+        FROM filtered_schema_list AS s
+            LEFT JOIN check_list ch ON ch.check_code = 'n1002'
+        WHERE
+            (SELECT enable_check_n1002 FROM conf)
+            AND s.nspname <> s.schema_name_wo_unwanted_characters
+    ),
     -- n1005 - confusion in name of relation attributes
     check_n1005 AS (
         SELECT
@@ -955,6 +997,30 @@ WITH
         WHERE
             (SELECT enable_check_n1005 FROM conf)
     ),
+    -- n1006 - unwanted characters in attribute name
+    check_n1006 AS (
+        SELECT
+            a.attnum AS object_id,
+            a.formatted_attribute_name AS object_name,
+            ch.object_type AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', a.attnum,
+                'object_name', a.formatted_attribute_name,
+                'object_type', ch.object_type,
+                'relation_name', fcl.formatted_class_full_name,
+                'relation_id', a.attrelid,
+                'check', ch.*
+            ) AS check_result_json
+        FROM filtered_attribute_list AS a
+            INNER JOIN filtered_class_list AS fcl ON a.attrelid = fcl.oid AND fcl.relkind IN ('r', 'v', 'm', 'p')
+            LEFT JOIN check_list ch ON ch.check_code = 'n1006'
+        WHERE
+            (SELECT enable_check_n1006 FROM conf)
+            AND a.attname <> a.attribute_name_wo_unwanted_characters
+    ),
     -- n1010 - confusion in name of relations
     check_n1010 AS (
         SELECT
@@ -982,6 +1048,28 @@ WITH
             (SELECT enable_check_n1010 FROM conf)
             AND fcl1.relkind IN ('r', 'v', 'm', 'p')
             AND fcl2.relkind IN ('r', 'v', 'm', 'p')
+    ),
+    -- n1011 - unwanted characters in relation name
+    check_n1011 AS (
+        SELECT
+            fcl.oid AS object_id,
+            fcl.formatted_class_full_name AS object_name,
+            ch.object_type AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', fcl.oid,
+                'object_name', fcl.formatted_class_full_name,
+                'object_type', ch.object_type,
+                'check', ch.*
+            ) AS check_result_json
+        FROM filtered_class_list AS fcl
+            LEFT JOIN check_list ch ON ch.check_code = 'n1011'
+        WHERE
+            (SELECT enable_check_n1011 FROM conf)
+            AND fcl.relkind IN ('r', 'v', 'm', 'p')
+            AND fcl.relname <> fcl.class_name_wo_unwanted_characters
     ),
     -- n1015 - confusion in name of indexes
     check_n1015 AS (
@@ -1013,6 +1101,29 @@ WITH
         WHERE
             (SELECT enable_check_n1015 FROM conf)
     ),
+    -- n1016 - unwanted characters in index name
+    check_n1016 AS (
+        SELECT
+            i.oid AS object_id,
+            i.formatted_index_full_name AS object_name,
+            ch.object_type AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', i.oid,
+                'object_name', i.formatted_index_full_name,
+                'object_type', ch.object_type,
+                'relation_name', fcl.formatted_class_full_name,
+                'check', ch.*
+            ) AS check_result_json
+        FROM filtered_index_list AS i
+            INNER JOIN filtered_class_list AS fcl ON i.indrelid = fcl.oid
+            LEFT JOIN check_list ch ON ch.check_code = 'n1016'
+        WHERE
+            (SELECT enable_check_n1016 FROM conf)
+            AND i.relname <> i.index_name_wo_unwanted_characters
+    ),
     -- n1020 - confusion in name of sequences
     check_n1020 AS (
         SELECT
@@ -1040,6 +1151,28 @@ WITH
             (SELECT enable_check_n1020 FROM conf)
             AND fcl1.relkind IN ('S')
             AND fcl2.relkind IN ('S')
+    ),
+    -- n1021 - unwanted characters in sequence name
+    check_n1021 AS (
+        SELECT
+            fcl.oid AS object_id,
+            fcl.formatted_class_full_name AS object_name,
+            ch.object_type AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', fcl.oid,
+                'object_name', fcl.formatted_class_full_name,
+                'object_type', ch.object_type,
+                'check', ch.*
+            ) AS check_result_json
+        FROM filtered_class_list AS fcl
+            LEFT JOIN check_list ch ON ch.check_code = 'n1021'
+        WHERE
+            (SELECT enable_check_n1021 FROM conf)
+            AND fcl.relkind IN ('S')
+            AND fcl.relname <> fcl.class_name_wo_unwanted_characters
     ),
     -- r1001 - unlogged table
     check_r1001 AS (
@@ -1116,13 +1249,23 @@ SELECT object_id, object_name, object_type, check_code, check_level, check_name,
     UNION ALL
     SELECT * FROM check_n1001  -- n1001 - confusion in name of schemas
     UNION ALL
+    SELECT * FROM check_n1002  -- n1002 - unwanted characters in schema name
+    UNION ALL
     SELECT * FROM check_n1005  -- n1005 - confusion in name of relation attributes
+    UNION ALL
+    SELECT * FROM check_n1006  -- n1006 - unwanted characters in attribute name
     UNION ALL
     SELECT * FROM check_n1010  -- n1010 - confusion in name of relations
     UNION ALL
+    SELECT * FROM check_n1011  -- n1011 - unwanted characters in relation name
+    UNION ALL
     SELECT * FROM check_n1015  -- n1015 - confusion in name of indexes
     UNION ALL
+    SELECT * FROM check_n1016  -- n1016 - unwanted characters in index name
+    UNION ALL
     SELECT * FROM check_n1020  -- n1020 - confusion in name of sequences
+    UNION ALL
+    SELECT * FROM check_n1021  -- n1021 - unwanted characters in sequence name
     UNION ALL
     SELECT * FROM check_no1001 -- no1001 - no unique key
     UNION ALL
