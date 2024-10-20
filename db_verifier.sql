@@ -2,7 +2,7 @@ WITH
     -- configure
     conf AS (
         SELECT
-            'ru'  AS conf_language_code,     -- null or value like 'en', 'ru' (see check_description)
+            'en'  AS conf_language_code,     -- null or value like 'en', 'ru' (see check_description)
             true  AS enable_check_c1001,     -- [warning] constraint not validated
             true  AS enable_check_fk1001,    -- [error] check fk uses mismatched types
             false AS enable_check_fk1002,    -- [warning] check fk uses nullable columns
