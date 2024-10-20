@@ -41,6 +41,7 @@ The current version is applicable to PostgreSQL 12 and later. Tested in versions
 | no1001 |             | no unique key                            | error    | enable        | Relation has no unique key.                                                                                |
 | no1002 | no1001      | no primary key constraint                | error    | enable        | Relation has no primary key constraint.                                                                    |                   
 | r1001  |             | unlogged table                           | warning  | enable        | Unlogged table is not replicated, truncated after crash.                                                   |
+| r1002  |             | relation without columns                 | warning  | enable        | Relation without columns.                                                                                  |
 | s1001  |             | unlogged sequence                        | warning  | enable        | Unlogged sequence is not replicated, reset after crash.                                                    |
 | s1010  |             | less 5% unused sequence values           | critical | enable        | The sequence has less than 5% unused values left.                                                          |
 | s1011  | s1010       | less 10% unused sequence values          | error    | enable        | The sequence has less than 10% unused values left.                                                         |

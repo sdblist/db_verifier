@@ -27,6 +27,7 @@ WITH
             true  AS enable_check_no1001,    -- [error] check no unique key
             true  AS enable_check_no1002,    -- [error] check no primary key constraint
             true  AS enable_check_r1001,     -- [warning] unlogged table
+            true  AS enable_check_r1002,     -- [warning] relation without columns
             true  AS enable_check_s1001,     -- [warning] unlogged sequence
             true  AS enable_check_s1010,     -- [critical] less 5% unused sequence values
             true  AS enable_check_s1011,     -- [error] less 10% unused sequence values
@@ -96,6 +97,7 @@ WITH
                 ('no1001',     null, 'no unique key', 'error', 'relation'),
                 ('no1002', 'no1001', 'no primary key constraint', 'error', 'relation'),
                 ('r1001',      null, 'unlogged table', 'warning', 'relation'),
+                ('r1002',      null, 'relation without columns', 'warning', 'relation'),
                 ('s1001',      null, 'unlogged sequence', 'warning', 'sequence'),
                 ('s1010',      null, 'less 5% unused sequence values', 'critical', 'sequence'),
                 ('s1011',   's1010', 'less 10% unused sequence values', 'error', 'sequence'),
@@ -161,6 +163,8 @@ WITH
                 ('no1002', 'ru', 'У отношения нет ограничения primary key.'),
                 ('r1001',  null, 'Unlogged table is not replicated, truncated after crash.'),
                 ('r1001',  'ru', 'Нежурналируемая таблица не реплицируется, очищается при сбоях.'),
+                ('r1002',  null, 'Relation without columns.'),
+                ('r1002',  'ru', 'У отношения нет атрибутов.'),
                 ('s1001',  null, 'Unlogged sequence is not replicated, reset after crash.'),
                 ('s1001',  'ru', 'Нежурналируемая последовательность не реплицируется, сбрасывается при сбоях.'),
                 ('s1010',  null, 'The sequence has less than 5% unused values left.'),
@@ -1196,6 +1200,28 @@ WITH
             AND t.relkind IN ('r', 'p')
             AND t.relpersistence = 'u'
     ),
+    -- r1002 - relation without columns
+    check_r1002 AS (
+        SELECT
+            t.oid AS object_id,
+            t.formatted_class_full_name AS object_name,
+            ch.object_type AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', t.oid,
+                'object_name', t.formatted_class_full_name,
+                'object_type', ch.object_type,
+                'check', ch.*
+            ) AS check_result_json
+        FROM filtered_class_list AS t
+            LEFT JOIN check_list ch ON ch.check_code = 'r1002'
+        WHERE
+            (SELECT enable_check_r1002 FROM conf)
+            AND t.relkind IN ('r', 'v', 'm', 'p')
+            AND NOT EXISTS (SELECT * FROM filtered_attribute_list a WHERE a.attrelid = t.oid)
+    ),
     -- sm0001 - invalid attribute type for uuid
     check_sm0001 AS (
         SELECT
@@ -1271,7 +1297,9 @@ SELECT object_id, object_name, object_type, check_code, check_level, check_name,
     UNION ALL
     SELECT * FROM check_no1002 -- no1002 - no primary key constraint
     UNION ALL
-    SELECT * FROM check_r1001  -- s1001 - unlogged table
+    SELECT * FROM check_r1001  -- r1001 - unlogged table
+    UNION ALL
+    SELECT * FROM check_r1002  -- r1002 - relation without columns
     UNION ALL
     SELECT * FROM check_s1001  -- s1001 - unlogged sequence
     UNION ALL
