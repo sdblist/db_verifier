@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS public.db_verifier_result CASCADE;

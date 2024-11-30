@@ -1,0 +1,150 @@
+name: Test GitHub CI/CD
+on:
+  push:
+    branches:
+      - test
+
+env:
+  PGUSER: postgres
+  PGPASSWORD: postgres
+  PGDATABASE: postgres
+  PGHOST: localhost  
+
+jobs:
+  build-test:
+    name: Test context
+    runs-on: ubuntu-latest
+
+    services:
+      postgres12:
+        image: postgres:12-alpine
+        env:
+          POSTGRES_USER: ${{env.PGUSER}}
+          POSTGRES_PASSWORD: ${{env.PGPASSWORD}}
+          POSTGRES_DB: ${{env.PGDATABASE}}
+        ports:
+        - 5432/tcp
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+
+      postgres13:
+        image: postgres:13-alpine
+        env:
+          POSTGRES_USER: ${{env.PGUSER}}
+          POSTGRES_PASSWORD: ${{env.PGPASSWORD}}
+          POSTGRES_DB: ${{env.PGDATABASE}}
+        ports:
+        - 5432/tcp
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+
+      postgres14:
+        image: postgres:14-alpine
+        env:
+          POSTGRES_USER: ${{env.PGUSER}}
+          POSTGRES_PASSWORD: ${{env.PGPASSWORD}}
+          POSTGRES_DB: ${{env.PGDATABASE}}
+        ports:
+        - 5432/tcp
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5   
+
+      postgres15:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: ${{env.PGUSER}}
+          POSTGRES_PASSWORD: ${{env.PGPASSWORD}}
+          POSTGRES_DB: ${{env.PGDATABASE}}
+        ports:
+        - 5432/tcp
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5   
+
+      postgres16:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ${{env.PGUSER}}
+          POSTGRES_PASSWORD: ${{env.PGPASSWORD}}
+          POSTGRES_DB: ${{env.PGDATABASE}}
+        ports:
+        - 5432/tcp
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5     
+
+      postgres17:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: ${{env.PGUSER}}
+          POSTGRES_PASSWORD: ${{env.PGPASSWORD}}
+          POSTGRES_DB: ${{env.PGDATABASE}}
+        ports:
+        - 5432/tcp
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5        
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.ref_name }}
+      - name: Display ref name
+        run: echo ${{ github.ref_name }}
+      # install postgresql-client
+      - name: Preinstall postgresql
+        run: |
+          sudo apt update
+          sudo apt --yes install postgresql-client
+      # test postgresql-12
+      - name: Run test.sh for postgresql-12
+        run: ./tests/run_tests.sh
+        shell: bash
+        env:
+          PGUSER: ${{env.PGUSER}}
+          PGPASSWORD: ${{env.PGPASSWORD}}
+          PGDATABASE: ${{env.PGDATABASE}}
+          PGHOST: ${{env.PGHOST}}
+          PGPORT: ${{job.services.postgres12.ports[5432]}}
+      # test postgresql-13
+      - name: Run test.sh for postgresql-13
+        run: ./tests/run_tests.sh
+        shell: bash
+        env:
+          PGUSER: ${{env.PGUSER}}
+          PGPASSWORD: ${{env.PGPASSWORD}}
+          PGDATABASE: ${{env.PGDATABASE}}
+          PGHOST: ${{env.PGHOST}}
+          PGPORT: ${{job.services.postgres13.ports[5432]}}
+      # test postgresql-14
+      - name: Run test.sh for postgresql-14
+        run: ./tests/run_tests.sh
+        shell: bash
+        env:
+          PGUSER: ${{env.PGUSER}}
+          PGPASSWORD: ${{env.PGPASSWORD}}
+          PGDATABASE: ${{env.PGDATABASE}}
+          PGHOST: ${{env.PGHOST}}
+          PGPORT: ${{job.services.postgres14.ports[5432]}}
+      # test postgresql-15
+      - name: Run test.sh for postgresql-15
+        run: ./tests/run_tests.sh
+        shell: bash
+        env:
+          PGUSER: ${{env.PGUSER}}
+          PGPASSWORD: ${{env.PGPASSWORD}}
+          PGDATABASE: ${{env.PGDATABASE}}
+          PGHOST: ${{env.PGHOST}}
+          PGPORT: ${{job.services.postgres15.ports[5432]}}
+      # test postgresql-16
+      - name: Run test.sh for postgresql-16
+        run: ./tests/run_tests.sh
+        shell: bash
+        env:
+          PGUSER: ${{env.PGUSER}}
+          PGPASSWORD: ${{env.PGPASSWORD}}
+          PGDATABASE: ${{env.PGDATABASE}}
+          PGHOST: ${{env.PGHOST}}
+          PGPORT: ${{job.services.postgres16.ports[5432]}}
+      # test postgresql-17
+      - name: Run test.sh for postgresql-17
+        run: ./tests/run_tests.sh
+        shell: bash
+        env:
+          PGUSER: ${{env.PGUSER}}
+          PGPASSWORD: ${{env.PGPASSWORD}}
+          PGDATABASE: ${{env.PGDATABASE}}
+          PGHOST: ${{env.PGHOST}}
+          PGPORT: ${{job.services.postgres17.ports[5432]}}
+

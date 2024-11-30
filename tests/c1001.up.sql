@@ -2,7 +2,6 @@
 
 -- insert invalid data and create not valid constraint
 -- c1001 - no
-DROP TABLE IF EXISTS public.c1001_1 CASCADE;
 CREATE TABLE public.c1001_1
 (
     id    integer GENERATED ALWAYS AS IDENTITY NOT NULL,
