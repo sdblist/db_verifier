@@ -23,4 +23,4 @@ FROM pg_catalog.pg_class AS t
     INNER JOIN pg_catalog.pg_namespace AS n ON t.relnamespace = n.oid
 WHERE
     t.relkind IN ('r', 'v', 'm', 'p')
-    AND NOT EXISTS (SELECT * FROM pg_catalog.pg_attribute a WHERE a.attrelid = t.oid AND a.attnum >= 1)
+    AND NOT EXISTS (SELECT * FROM pg_catalog.pg_attribute AS a WHERE a.attrelid = t.oid AND a.attnum >= 1)

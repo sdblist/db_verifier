@@ -72,35 +72,18 @@ sed -i "/AS enable_check_sm0001/s/.*/false AS enable_check_sm0001,/"  db_verifie
 # result to table db_verifier_result
 ## db_verifier.sql
 sed -i "/SELECT object_id, object_name, object_type, check_code, check_level, check_name, check_result_json FROM (/s/.*/SELECT object_id, object_name, object_type, check_code, check_level, check_name, check_result_json INTO UNLOGGED public.db_verifier_result FROM (/1" db_verifier.sql
-## c1001
-sed -i "/) AS check_result_json/s/.*/) AS check_result_json INTO UNLOGGED public.db_verifier_result/1" ./shards/c1001.sql
 
 # echo postgres server version
 echo "Server version: $(psql --command='select version();' --quiet --no-align --tuples-only --set=ON_ERROR_STOP=on)"
 
 # c1001
-## enable check
-sed -i "/AS enable_check_c1001/s/.*/true AS enable_check_c1001,/"  db_verifier.sql
-## test
-psql --file=./tests/c1001.up.sql --set=ON_ERROR_STOP=on > /dev/null
-### test db_verifier.sql
-psql --file=./db_verifier.sql --set=ON_ERROR_STOP=on > /dev/null
-if [[ $(psql --file=./tests/c1001.test.sql --quiet --no-align --tuples-only --set=ON_ERROR_STOP=on) -ne 0 ]]; then
-    echo "db_verifier.sql - c1001 - error"
-  exit 1
-else
-    echo "db_verifier.sql - c1001 - OK"
-fi
-psql --file=./tests/db_verifier_result.down.sql --set=ON_ERROR_STOP=on > /dev/null
-### test shards/c1001.sql
-psql --file=./shards/c1001.sql --set=ON_ERROR_STOP=on > /dev/null
-if [[ $(psql --file=./tests/c1001.test.sql --quiet --no-align --tuples-only --set=ON_ERROR_STOP=on) -ne 0 ]]; then
-    echo "shards/c1001.sql - c1001 - error"
-  exit 1
-else
-    echo "shards/c1001.sql - c1001 - OK"
-fi
-psql --file=./tests/db_verifier_result.down.sql --set=ON_ERROR_STOP=on > /dev/null
-psql --file=./tests/c1001.down.sql --set=ON_ERROR_STOP=on > /dev/null
-## disable check
-sed -i "/AS enable_check_c1001/s/.*/false AS enable_check_c1001,/"  db_verifier.sql
+CHECK_NAME="c1001"
+source "./tests/run_test_template.sh"
+
+# r1002
+CHECK_NAME="r1002"
+source "./tests/run_test_template.sh"
+
+# sm0001
+CHECK_NAME="sm0001"
+source "./tests/run_test_template.sh"

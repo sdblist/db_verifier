@@ -1244,10 +1244,8 @@ WITH
             LEFT JOIN check_list ch ON ch.check_code = 'sm0001'
         WHERE
             (SELECT enable_smart_sm0001 FROM conf)
-            AND (
-                (a.atttypid IN (1042, 1043) AND ((a.atttypmod - 4) IN (32, 36) )
-                    AND (a.attname ILIKE '%uid%' OR a.attname ILIKE '%\_id%'))
-            )
+            AND (a.atttypid IN (1042, 1043) AND ((a.atttypmod - 4) IN (32, 36))
+                    AND (a.attname ILIKE '%uid%' OR a.attname ILIKE '%\_id%' OR a.attname ILIKE 'id'))
     )
 -- result
 SELECT object_id, object_name, object_type, check_code, check_level, check_name, check_result_json FROM (
