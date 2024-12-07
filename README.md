@@ -11,6 +11,7 @@ The current version is applicable to PostgreSQL 12 and later. Tested in PostgreS
 ## Project structure
 
 * [`db_verifier.sql`](db_verifier.sql) - script, checks and displays a list of errors/warnings/recommendations with comments
+* `shards` - directory where the checks are divided into separate files (file name corresponds to the check code)
 * `tests` - directory with DDL/DML scripts that are used to debug [`db_verifier.sql`](db_verifier.sql) and demonstrate errors
 
 ## Check list
