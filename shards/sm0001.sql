@@ -1,4 +1,4 @@
--- sm0001 invalid attribute type for uuid
+-- sm0001 - invalid attribute type for uuid
 SELECT
     a.attnum AS object_id,
     concat(format('%I', n.nspname), '.',  format('%I', c.relname), '.',  format('%I', a.attname)) AS object_name,
@@ -17,6 +17,7 @@ SELECT
             'parent_check_code', null,
             'check_name', 'invalid attribute type for uuid',
             'check_level', 'notice',
+            'check_version', 1,
             'object_type', 'attribute',
             'check_source_name', 'system catalog'
             )

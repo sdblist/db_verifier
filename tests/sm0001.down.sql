@@ -1,4 +1,4 @@
--- sm0001 invalid attribute type for uuid
+-- sm0001 - invalid attribute type for uuid
 
 -- sm0001 - ok
 DROP TABLE IF EXISTS public.sm0001_1 CASCADE;

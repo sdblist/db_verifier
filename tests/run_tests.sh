@@ -76,14 +76,45 @@ sed -i "/SELECT object_id, object_name, object_type, check_code, check_level, ch
 # echo postgres server version
 echo "Server version: $(psql --command='select version();' --quiet --no-align --tuples-only --set=ON_ERROR_STOP=on)"
 
+# minimal postgresql server version for test running - default value
+MIN_PG_VERSION_DEFAULT="120000"
+
 # c1001
 CHECK_NAME="c1001"
+MIN_PG_VERSION="${MIN_PG_VERSION_DEFAULT}"
+source "./tests/run_test_template.sh"
+
+# fk1001
+CHECK_NAME="fk1001"
+MIN_PG_VERSION="${MIN_PG_VERSION_DEFAULT}"
+source "./tests/run_test_template.sh"
+
+# fk1002
+CHECK_NAME="fk1002"
+MIN_PG_VERSION="${MIN_PG_VERSION_DEFAULT}"
+source "./tests/run_test_template.sh"
+
+# fk1007
+CHECK_NAME="fk1007"
+MIN_PG_VERSION="${MIN_PG_VERSION_DEFAULT}"
+source "./tests/run_test_template.sh"
+
+# r1001
+CHECK_NAME="r1001"
+MIN_PG_VERSION="${MIN_PG_VERSION_DEFAULT}"
 source "./tests/run_test_template.sh"
 
 # r1002
 CHECK_NAME="r1002"
+MIN_PG_VERSION="${MIN_PG_VERSION_DEFAULT}"
+source "./tests/run_test_template.sh"
+
+# s1001
+CHECK_NAME="s1001"
+MIN_PG_VERSION="150000"
 source "./tests/run_test_template.sh"
 
 # sm0001
 CHECK_NAME="sm0001"
+MIN_PG_VERSION="${MIN_PG_VERSION_DEFAULT}"
 source "./tests/run_test_template.sh"

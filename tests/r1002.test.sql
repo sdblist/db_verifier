@@ -1,4 +1,4 @@
--- r1002 relation without columns
+-- r1002 - relation without columns
 -- result in public.db_verifier_result
 
 SELECT

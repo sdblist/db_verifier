@@ -1,4 +1,4 @@
--- sm0001 invalid attribute type for uuid
+-- sm0001 - invalid attribute type for uuid
 -- result in public.db_verifier_result
 
 SELECT

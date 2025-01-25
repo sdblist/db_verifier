@@ -69,41 +69,42 @@ WITH
             t.parent_check_code,
             t.check_name,
             t.check_level,
+            t.check_version,
             t.object_type,
             'system catalog' AS check_source_name
         FROM
             (VALUES
-                ('c1001',      null, 'constraint not validated', 'warning', 'constraint'),
-                ('fk1001',     null, 'fk uses mismatched types', 'error', 'constraint'),
-                ('fk1002',     null, 'fk uses nullable columns', 'warning', 'constraint'),
-                ('fk1007',     null, 'not involved in foreign keys', 'notice', 'relation'),
-                ('fk1010',     null, 'similar FK', 'warning', 'constraint'),
-                ('fk1011', 'fk1010', 'FK have common attributes', 'warning', 'constraint'),
-                ('i1001',      null, 'similar indexes', 'warning', 'index'),
-                ('i1002',      null, 'index has bad signs', 'error', 'index'),
-                ('i1003',      null, 'similar indexes unique and not unique', 'warning', 'index'),
-                ('i1005',      null, 'similar indexes (roughly)', 'notice', 'index'),
-                ('i1010',      null, 'b-tree index for array column', 'notice', 'index'),
-                ('n1001',      null, 'confusion in name of schemas', 'warning', 'schema'),
-                ('n1002',      null, 'unwanted characters in schema name', 'notice', 'schema'),
-                ('n1005',      null, 'confusion in name of relation attributes', 'warning', 'attribute'),
-                ('n1006',      null, 'unwanted characters in attribute name', 'notice', 'attribute'),
-                ('n1010',      null, 'confusion in name of relations', 'warning', 'relation'),
-                ('n1011',      null, 'unwanted characters in relation name', 'notice', 'relation'),
-                ('n1015',      null, 'confusion in name of indexes', 'warning', 'index'),
-                ('n1016',      null, 'unwanted characters in index name', 'notice', 'index'),
-                ('n1020',      null, 'confusion in name of sequences', 'warning', 'sequence'),
-                ('n1021',      null, 'unwanted characters in sequence name', 'notice', 'sequence'),
-                ('no1001',     null, 'no unique key', 'error', 'relation'),
-                ('no1002', 'no1001', 'no primary key constraint', 'error', 'relation'),
-                ('r1001',      null, 'unlogged table', 'warning', 'relation'),
-                ('r1002',      null, 'relation without columns', 'warning', 'relation'),
-                ('s1001',      null, 'unlogged sequence', 'warning', 'sequence'),
-                ('s1010',      null, 'less 5% unused sequence values', 'critical', 'sequence'),
-                ('s1011',   's1010', 'less 10% unused sequence values', 'error', 'sequence'),
-                ('s1012',   's1011', 'less 20% unused sequence values', 'warning', 'sequence'),
-                ('sm0001',     null, 'invalid attribute type for uuid', 'notice', 'attribute')
-            ) AS t(check_code, parent_check_code, check_name, check_level, object_type)
+                ('c1001',      null, 'constraint not validated', 'warning', 1, 'constraint'),
+                ('fk1001',     null, 'fk uses mismatched types', 'error', 1, 'constraint'),
+                ('fk1002',     null, 'fk uses nullable columns', 'warning', 1, 'constraint'),
+                ('fk1007',     null, 'not involved in foreign keys', 'notice', 1, 'relation'),
+                ('fk1010',     null, 'similar FK', 'warning', 1, 'constraint'),
+                ('fk1011', 'fk1010', 'FK have common attributes', 'warning', 1, 'constraint'),
+                ('i1001',      null, 'similar indexes', 'warning', 1, 'index'),
+                ('i1002',      null, 'index has bad signs', 'error', 1, 'index'),
+                ('i1003',      null, 'similar indexes unique and not unique', 'warning', 1, 'index'),
+                ('i1005',      null, 'similar indexes (roughly)', 'notice', 1, 'index'),
+                ('i1010',      null, 'b-tree index for array column', 'notice', 1, 'index'),
+                ('n1001',      null, 'confusion in name of schemas', 'warning', 1, 'schema'),
+                ('n1002',      null, 'unwanted characters in schema name', 'notice', 1, 'schema'),
+                ('n1005',      null, 'confusion in name of relation attributes', 'warning', 1, 'attribute'),
+                ('n1006',      null, 'unwanted characters in attribute name', 'notice', 1, 'attribute'),
+                ('n1010',      null, 'confusion in name of relations', 'warning', 1, 'relation'),
+                ('n1011',      null, 'unwanted characters in relation name', 'notice', 1, 'relation'),
+                ('n1015',      null, 'confusion in name of indexes', 'warning', 1, 'index'),
+                ('n1016',      null, 'unwanted characters in index name', 'notice', 1, 'index'),
+                ('n1020',      null, 'confusion in name of sequences', 'warning', 1, 'sequence'),
+                ('n1021',      null, 'unwanted characters in sequence name', 'notice', 1, 'sequence'),
+                ('no1001',     null, 'no unique key', 'error', 1, 'relation'),
+                ('no1002', 'no1001', 'no primary key constraint', 'error', 1, 'relation'),
+                ('r1001',      null, 'unlogged table', 'warning', 1, 'relation'),
+                ('r1002',      null, 'relation without columns', 'warning', 1, 'relation'),
+                ('s1001',      null, 'unlogged sequence', 'warning', 1, 'sequence'),
+                ('s1010',      null, 'less 5% unused sequence values', 'critical', 1, 'sequence'),
+                ('s1011',   's1010', 'less 10% unused sequence values', 'error', 1, 'sequence'),
+                ('s1012',   's1011', 'less 20% unused sequence values', 'warning', 1, 'sequence'),
+                ('sm0001',     null, 'invalid attribute type for uuid', 'notice', 1, 'attribute')
+            ) AS t(check_code, parent_check_code, check_name, check_level, check_version, object_type)
             INNER JOIN check_level_list AS cll ON cll.check_level = t.check_level
             INNER JOIN object_type_list AS otl ON otl.object_type = t.object_type
     ),
@@ -418,19 +419,17 @@ WITH
                 formatted_constraint_name,
                 conrelid,
                 confrelid,
-                array_agg (rel_att_name order by att_order) as rel_att_names,
-                array_agg (rel_att_formatted_type_name2 order by att_order) as rel_att_type_names,
-                array_agg (frel_att_name order by att_order) as frel_att_names,
-                array_agg (frel_att_formatted_type_name2 order by att_order) as frel_att_type_names
+                array_agg (rel_att_name order by att_order) AS rel_att_names,
+                array_agg (rel_att_formatted_type_name2 order by att_order) AS rel_att_type_names,
+                array_agg (frel_att_name order by att_order) AS frel_att_names,
+                array_agg (frel_att_formatted_type_name2 order by att_order) AS frel_att_type_names
             FROM filtered_fk_list_attribute
             WHERE
                 ((rel_att_type_id <> frel_att_type_id) OR (rel_att_type_mod <> frel_att_type_mod))
             GROUP BY 1, 2, 3, 4
         ) AS c
-            INNER JOIN filtered_class_list AS t
-                ON t.oid = c.conrelid
-            INNER JOIN filtered_class_list AS tf
-                ON tf.oid = c.confrelid
+            INNER JOIN filtered_class_list AS t ON t.oid = c.conrelid
+            INNER JOIN filtered_class_list AS tf ON tf.oid = c.confrelid
             LEFT JOIN check_list ch ON ch.check_code = 'fk1001'
         WHERE
             (SELECT enable_check_fk1001 FROM conf)
@@ -458,17 +457,15 @@ WITH
                 formatted_constraint_name,
                 conrelid,
                 confrelid,
-                array_agg (rel_att_name order by att_order) as rel_att_names
+                array_agg (rel_att_name order by att_order) AS rel_att_names
             FROM filtered_fk_list_attribute
             WHERE
                 (NOT rel_att_notnull)
                 AND confmatchtype NOT IN ('f')
             GROUP BY 1, 2, 3, 4
         ) AS c
-            INNER JOIN filtered_class_list AS t
-                ON t.oid = c.conrelid
-            INNER JOIN filtered_class_list AS tf
-                ON tf.oid = c.confrelid
+            INNER JOIN filtered_class_list AS t ON t.oid = c.conrelid
+            INNER JOIN filtered_class_list AS tf ON tf.oid = c.confrelid
             LEFT JOIN check_list ch ON ch.check_code = 'fk1002'
         WHERE
             (SELECT enable_check_fk1002 FROM conf)
@@ -503,8 +500,8 @@ WITH
             formatted_constraint_name,
             conrelid,
             confrelid,
-            array_agg (rel_att_name order by att_order) as rel_att_names,
-            array_agg (frel_att_name order by att_order) as frel_att_names
+            array_agg (rel_att_name order by att_order) AS rel_att_names,
+            array_agg (frel_att_name order by att_order) AS frel_att_names
         FROM filtered_fk_list_attribute
         GROUP BY 1, 2, 3, 4
     ),

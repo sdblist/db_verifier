@@ -17,6 +17,7 @@ SELECT
             'parent_check_code', null,
             'check_name', 'constraint not validated',
             'check_level', 'warning',
+            'check_version', 1,
             'object_type', 'constraint',
             'check_source_name', 'system catalog'
             )
