@@ -1,6 +1,5 @@
--- fk1010 similar FK
--- fk1011 FK have common attributes
-DROP TABLE IF EXISTS public.fk1010_1 CASCADE;
+-- fk1010 - similar FK
+
 CREATE TABLE public.fk1010_1
 (
     id    integer NOT NULL,
@@ -13,14 +12,6 @@ CREATE TABLE public.fk1010_1
 );
 
 -- fk1010 - yes  fk1010_1_fk_fk1010_1_id_i2 + fk1010_1_fk_fk1010_1_id_i2_copy
-
--- fk1011 - yes fk1010_1_fk_fk1010_1_id + fk1010_1_fk_fk1010_1_id_i1
--- fk1011 - yes fk1010_1_fk_fk1010_1_id + fk1010_1_fk_fk1010_1_id_i2
--- fk1011 - yes fk1010_1_fk_fk1010_1_id + fk1010_1_fk_fk1010_1_id_i2_copy
--- fk1011 - yes fk1010_1_fk_fk1010_1_id_i1 + fk1010_1_fk_fk1010_1_id_i2
--- fk1011 - yes fk1010_1_fk_fk1010_1_id_i1 + fk1010_1_fk_fk1010_1_id_i2_copy
--- fk1011 - yes fk1010_1_fk_fk1010_1_id_i2_copy + fk1010_1_fk_fk1010_1_i2
-DROP TABLE IF EXISTS public.fk1010_1_fk;
 CREATE TABLE public.fk1010_1_fk
 (
     id    integer GENERATED ALWAYS AS IDENTITY NOT NULL,

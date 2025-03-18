@@ -38,6 +38,11 @@
 | n1016  |             | unwanted characters in index name        | notice   | enable        | Имя индекса содержит нежелательные символы, такие как точки, пробелы и др.                                                           |
 | n1020  |             | confusion in name of sequences           | warning  | enable        | Возможна путаница в наименованиях последовательностей в одной схеме. Наименования опасно похожи.                                     |
 | n1021  |             | unwanted characters in sequence name     | notice   | enable        | Имя последовательности содержит нежелательные символы, такие как точки, пробелы и др.                                                |
+| n1030  |             | constraint name reserved keyword         | warning  | enable        | Имя ограничения совпадает с зарезервированным ключевым словом.                                                                       |
+| n1032  |             | index name reserved keyword              | warning  | enable        | Имя индекса совпадает с зарезервированным ключевым словом.                                                                           | 
+| n1034  |             | relation name reserved keyword           | warning  | enable        | Имя отношения совпадает с зарезервированным ключевым словом.                                                                         |
+| n1036  |             | sequence name reserved keyword           | warning  | enable        | Имя последовательности совпадает с зарезервированным ключевым словом.                                                                |
+| n1038  |             | attribute name reserved keyword          | warning  | enable        | Имя поля совпадает с зарезервированным ключевым словом.                                                                              |
 | no1001 |             | no unique key                            | error    | enable        | У отношения нет уникального ключа (набора полей). Это может создавать проблемы при удалении записей, при логической репликации и др. |
 | no1002 | no1001      | no primary key constraint                | error    | enable        | У отношения нет ограничения primary key.                                                                                             |
 | r1001  |             | unlogged table                           | warning  | enable        | Нежурналируемая таблица не реплицируется, очищается при сбоях.                                                                       |
@@ -123,10 +128,10 @@ docker container remove db_verifier
 
 ### Переключение локализации сообщений с помощью bash команды
 
-Изменение настройки локализации сообщений на `en`, атрибут `conf_language_code`.
+Изменение настройки локализации сообщений на `ru`, атрибут `conf_language_code`.
 
 ```shell
-sed -i "/AS conf_language_code,/c\'en' AS conf_language_code," db_verifier.sql
+sed -i "/AS conf_language_code/s/.*/'ru' AS conf_language_code,/"  db_verifier.sql
 ```
 
 ### Явное включение/отключение проверок с помощью bash команды
@@ -134,27 +139,27 @@ sed -i "/AS conf_language_code,/c\'en' AS conf_language_code," db_verifier.sql
 Явное отключение проверки `i1001` (similar indexes), атрибут `enable_check_i1001`.
 
 ```shell
-sed -i "s/AS enable_check_i1001/AND false AS enable_check_i1001/" db_verifier.sql
+sed -i "/AS enable_check_i1001/s/.*/false AS enable_check_i1001,/"  db_verifier.sql
 ```
 
 ```sql
--- до корректировки
-    true AS enable_check_i1001      -- [warning] similar indexes
--- после корректировки
-    true  AND false AS enable_check_i1001      -- [warning] similar indexes
+-- before
+    true AS enable_check_i1001,
+-- after
+    false AS enable_check_i1001,
 ```
 
 Явное включение проверки `fk1007` (not involved in foreign keys), атрибут `enable_check_fk1007`.
 
 ```shell
-sed -i "s/AS enable_check_fk1007/OR true AS enable_check_fk1007/" db_verifier.sql
+sed -i "/AS enable_check_fk1007/s/.*/false AS enable_check_fk1007,/"  db_verifier.sql
 ```
 
 ```sql
--- до корректировки
-    false AS enable_check_fk1007,    -- [notice] not involved in foreign keys
--- после корректировки
-    false OR true AS enable_check_fk1007,    -- [notice] not involved in foreign keys
+-- before
+    false AS enable_check_fk1007,
+-- after
+    true AS enable_check_fk1007,
 ```
 
 ### Фильтрация результатов проверки

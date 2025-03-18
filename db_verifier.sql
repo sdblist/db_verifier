@@ -24,6 +24,11 @@ WITH
             true  AS enable_check_n1016,     -- [notice] unwanted characters in index name
             true  AS enable_check_n1020,     -- [warning] confusion in name of sequences
             true  AS enable_check_n1021,     -- [notice] unwanted characters in sequence name
+            true  AS enable_check_n1030,     -- [warning] constraint name reserved keyword
+            true  AS enable_check_n1032,     -- [warning] index name reserved keyword
+            true  AS enable_check_n1034,     -- [warning] relation name reserved keyword
+            true  AS enable_check_n1036,     -- [warning] sequence name reserved keyword
+            true  AS enable_check_n1038,     -- [warning] attribute name reserved keyword
             true  AS enable_check_no1001,    -- [error] check no unique key
             true  AS enable_check_no1002,    -- [error] check no primary key constraint
             true  AS enable_check_r1001,     -- [warning] unlogged table
@@ -95,6 +100,11 @@ WITH
                 ('n1016',      null, 'unwanted characters in index name', 'notice', 1, 'index'),
                 ('n1020',      null, 'confusion in name of sequences', 'warning', 1, 'sequence'),
                 ('n1021',      null, 'unwanted characters in sequence name', 'notice', 1, 'sequence'),
+                ('n1030',      null, 'constraint name reserved keyword', 'warning', 1, 'constraint'),
+                ('n1032',      null, 'index name reserved keyword', 'warning', 1, 'index'),
+                ('n1034',      null, 'relation name reserved keyword', 'warning', 1, 'relation'),
+                ('n1036',      null, 'sequence name reserved keyword', 'warning', 1, 'sequence'),
+                ('n1038',      null, 'attribute name reserved keyword', 'warning', 1, 'attribute'),
                 ('no1001',     null, 'no unique key', 'error', 1, 'relation'),
                 ('no1002', 'no1001', 'no primary key constraint', 'error', 1, 'relation'),
                 ('r1001',      null, 'unlogged table', 'warning', 1, 'relation'),
@@ -158,6 +168,16 @@ WITH
                 ('n1020',  'ru', 'Возможна путаница в наименованиях последовательностей в одной схеме. Наименования опасно похожи.'),
                 ('n1021',  null, 'Sequence name contains unwanted characters such as dots, spaces, etc.'),
                 ('n1021',  'ru', 'Имя последовательности содержит нежелательные символы, такие как точки, пробелы и др.'),
+                ('n1030',  null, 'Constraint name matches a reserved keyword.'),
+                ('n1030',  'ru', 'Имя ограничения совпадает с зарезервированным ключевым словом.'),
+                ('n1032',  null, 'Index name matches a reserved keyword.'),
+                ('n1032',  'ru', 'Имя индекса совпадает с зарезервированным ключевым словом.'),
+                ('n1034',  null, 'Relation name matches a reserved keyword.'),
+                ('n1034',  'ru', 'Имя отношения совпадает с зарезервированным ключевым словом.'),
+                ('n1036',  null, 'Sequence name matches a reserved keyword.'),
+                ('n1036',  'ru', 'Имя последовательности совпадает с зарезервированным ключевым словом.'),
+                ('n1038',  null, 'Attribute name matches a reserved keyword.'),
+                ('n1038',  'ru', 'Имя поля совпадает с зарезервированным ключевым словом.'),
                 ('no1001', null, 'Relation has no unique key.'),
                 ('no1001', 'ru', 'У отношения нет уникального ключа (набора полей). Это может создавать проблемы при удалении записей, при логической репликации и др.'),
                 ('no1002', null, 'Relation has no primary key constraint.'),
@@ -575,6 +595,7 @@ WITH
         SELECT
             c.oid,
             c.contype,
+            c.conname,
             format('%I', c.conname) AS formatted_constraint_name,
             c.conrelid,
             c.confrelid,
@@ -1175,6 +1196,119 @@ WITH
             AND fcl.relkind IN ('S')
             AND fcl.relname <> fcl.class_name_wo_unwanted_characters
     ),
+    -- n1030 - constraint name reserved keyword
+    check_n1030 AS (
+        SELECT
+            c.oid AS object_id,
+            c.formatted_constraint_name AS object_name,
+            ch.object_type AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', c.oid,
+                'object_name', c.formatted_constraint_name,
+                'object_type', ch.object_type,
+                'relation_name', t.formatted_class_full_name,
+                'constraint_type', c.contype,
+                'check', ch.*
+            ) AS check_result_json
+        FROM filtered_c_list AS c
+            INNER JOIN filtered_class_list AS t
+                ON t.oid = c.conrelid AND c.conname IN (SELECT word FROM pg_get_keywords() WHERE catcode NOT IN ('U'))
+            LEFT JOIN check_list ch ON ch.check_code = 'n1030'
+        WHERE
+            (SELECT enable_check_n1030 FROM conf)
+    ),
+    -- n1032 - index name reserved keyword
+    check_n1032 AS (
+        SELECT
+            i.oid AS object_id,
+            i.formatted_index_full_name AS object_name,
+            ch.object_type AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', i.oid,
+                'object_name', i.formatted_index_full_name,
+                'object_type', ch.object_type,
+                'relation_name', t.formatted_class_full_name,
+                'check', ch.*
+            ) AS check_result_json
+        FROM filtered_index_list AS i
+            INNER JOIN filtered_class_list AS t ON i.indrelid = t.oid
+            LEFT JOIN check_list ch ON ch.check_code = 'n1032'
+        WHERE
+            (SELECT enable_check_n1032 FROM conf)
+            AND i.relname IN (SELECT word FROM pg_get_keywords() WHERE catcode NOT IN ('U'))
+    ),
+    -- n1034 - relation name reserved keyword
+    check_n1034 AS (
+        SELECT
+            t.oid AS object_id,
+            t.formatted_class_full_name AS object_name,
+            ch.object_type AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', t.oid,
+                'object_name', t.formatted_class_full_name,
+                'object_type', ch.object_type,
+                'check', ch.*
+            ) AS check_result_json
+        FROM filtered_class_list AS t
+            LEFT JOIN check_list ch ON ch.check_code = 'n1034'
+        WHERE
+            (SELECT enable_check_n1034 FROM conf)
+            AND t.relkind IN ('r', 'v', 'm', 'p')
+            AND t.relname IN (SELECT word FROM pg_get_keywords() WHERE catcode NOT IN ('U'))
+    ),
+    -- n1036 - sequence name reserved keyword
+    check_n1036 AS (
+        SELECT
+            t.oid AS object_id,
+            t.formatted_class_full_name AS object_name,
+            ch.object_type AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', t.oid,
+                'object_name', t.formatted_class_full_name,
+                'object_type', ch.object_type,
+                'check', ch.*
+            ) AS check_result_json
+        FROM filtered_class_list AS t
+            LEFT JOIN check_list ch ON ch.check_code = 'n1036'
+        WHERE
+            (SELECT enable_check_n1036 FROM conf)
+            AND t.relkind IN ('S')
+            AND t.relname IN (SELECT word FROM pg_get_keywords() WHERE catcode NOT IN ('U'))
+    ),
+    -- n1038 - attribute name reserved keyword
+    check_n1038 AS (
+        SELECT
+            a.attnum AS object_id,
+            a.formatted_attribute_full_name AS object_name,
+            ch.object_type AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', a.attnum,
+                'object_name', a.formatted_attribute_full_name,
+                'object_type', ch.object_type,
+                'relation_name', a.formatted_class_full_name,
+                'check', ch.*
+            ) AS check_result_json
+        FROM filtered_attribute_list AS a
+            LEFT JOIN check_list ch ON ch.check_code = 'n1038'
+        WHERE
+            (SELECT enable_check_n1038 FROM conf)
+            AND a.attname IN (SELECT word FROM pg_get_keywords() WHERE catcode NOT IN ('U'))
+    ),
     -- r1001 - unlogged table
     check_r1001 AS (
         SELECT
@@ -1287,6 +1421,16 @@ SELECT object_id, object_name, object_type, check_code, check_level, check_name,
     SELECT * FROM check_n1020  -- n1020 - confusion in name of sequences
     UNION ALL
     SELECT * FROM check_n1021  -- n1021 - unwanted characters in sequence name
+    UNION ALL
+    SELECT * FROM check_n1030  -- n1030 - constraint name reserved keyword
+    UNION ALL
+    SELECT * FROM check_n1032  -- n1032 - index name reserved keyword
+    UNION ALL
+    SELECT * FROM check_n1034  -- n1034 - relation name reserved keyword
+    UNION ALL
+    SELECT * FROM check_n1036  -- n1036 - sequence name reserved keyword
+    UNION ALL
+    SELECT * FROM check_n1038  -- n1038 - attribute name reserved keyword
     UNION ALL
     SELECT * FROM check_no1001 -- no1001 - no unique key
     UNION ALL

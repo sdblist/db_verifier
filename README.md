@@ -39,6 +39,11 @@ The current version is applicable to PostgreSQL 12 and later. Tested in PostgreS
 | n1016  |             | unwanted characters in index name        | notice   | enable        | Index name contains unwanted characters such as dots, spaces, etc.                                         |
 | n1020  |             | confusion in name of sequences           | warning  | enable        | There may be confusion in the name of the sequences in the same schema. The names are dangerously similar. |
 | n1021  |             | unwanted characters in sequence name     | notice   | enable        | Sequence name contains unwanted characters such as dots, spaces, etc.                                      |
+| n1030  |             | constraint name reserved keyword         | warning  | enable        | Constraint name matches a reserved keyword.                                                                |
+| n1032  |             | index name reserved keyword              | warning  | enable        | Index name matches a reserved keyword.                                                                     |
+| n1034  |             | relation name reserved keyword           | warning  | enable        | Relation name matches a reserved keyword.                                                                  |
+| n1036  |             | sequence name reserved keyword           | warning  | enable        | Sequence name matches a reserved keyword.                                                                  |
+| n1038  |             | attribute name reserved keyword          | warning  | enable        | Attribute name matches a reserved keyword.                                                                 |
 | no1001 |             | no unique key                            | error    | enable        | Relation has no unique key.                                                                                |
 | no1002 | no1001      | no primary key constraint                | error    | enable        | Relation has no primary key constraint.                                                                    |                   
 | r1001  |             | unlogged table                           | warning  | enable        | Unlogged table is not replicated, truncated after crash.                                                   |
@@ -128,7 +133,7 @@ docker container remove db_verifier
 Changing the message localization setting to `en`, attribute `conf_language_code`.
 
 ```shell
-sed -i "/AS conf_language_code,/c\'en' AS conf_language_code," db_verifier.sql
+sed -i "/AS conf_language_code/s/.*/'en' AS conf_language_code,/"  db_verifier.sql
 ```
 
 ### Explicitly enable/disable checks using bash command
@@ -136,27 +141,27 @@ sed -i "/AS conf_language_code,/c\'en' AS conf_language_code," db_verifier.sql
 Explicitly disabling the `i1001` check (similar indexes), the `enable_check_i1001` attribute.
 
 ```shell
-sed -i "s/AS enable_check_i1001/AND false AS enable_check_i1001/" db_verifier.sql
+sed -i "/AS enable_check_i1001/s/.*/false AS enable_check_i1001,/"  db_verifier.sql
 ```
 
 ```sql
 -- before
-    true AS enable_check_i1001      -- [warning] similar indexes
+    true AS enable_check_i1001,
 -- after
-    true  AND false AS enable_check_i1001      -- [warning] similar indexes
+    false AS enable_check_i1001,
 ```
 
 Explicitly enabling the `fk1007` check (not involved in foreign keys), attribute `enable_check_fk1007`.
 
 ```shell
-sed -i "s/AS enable_check_fk1007/OR true AS enable_check_fk1007/" db_verifier.sql
+sed -i "/AS enable_check_fk1007/s/.*/false AS enable_check_fk1007,/"  db_verifier.sql
 ```
 
 ```sql
 -- before
-    false AS enable_check_fk1007,    -- [notice] not involved in foreign keys
+    false AS enable_check_fk1007,
 -- after
-    false OR true AS enable_check_fk1007,    -- [notice] not involved in foreign keys
+    true AS enable_check_fk1007,
 ```
 
 ### Filtering scan results
