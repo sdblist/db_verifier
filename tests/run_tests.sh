@@ -50,6 +50,10 @@ sed -i "/AS enable_check_n1016/s/.*/false AS enable_check_n1016,/"  db_verifier.
 sed -i "/AS enable_check_n1020/s/.*/false AS enable_check_n1020,/"  db_verifier.sql
 ## n1021
 sed -i "/AS enable_check_n1021/s/.*/false AS enable_check_n1021,/"  db_verifier.sql
+## n1025
+sed -i "/AS enable_check_n1025/s/.*/false AS enable_check_n1025,/"  db_verifier.sql
+## n1026
+sed -i "/AS enable_check_n1026/s/.*/false AS enable_check_n1026,/"  db_verifier.sql
 ## n1030
 sed -i "/AS enable_check_n1030/s/.*/false AS enable_check_n1030,/"  db_verifier.sql
 ## n1032
@@ -60,6 +64,8 @@ sed -i "/AS enable_check_n1034/s/.*/false AS enable_check_n1034,/"  db_verifier.
 sed -i "/AS enable_check_n1036/s/.*/false AS enable_check_n1036,/"  db_verifier.sql
 ## n1038
 sed -i "/AS enable_check_n1038/s/.*/false AS enable_check_n1038,/"  db_verifier.sql
+## n1040
+sed -i "/AS enable_check_n1040/s/.*/false AS enable_check_n1040,/"  db_verifier.sql
 ## no1001
 sed -i "/AS enable_check_no1001/s/.*/false AS enable_check_no1001,/"  db_verifier.sql
 ## no1002
@@ -119,6 +125,16 @@ CHECK_NAME="fk1011"
 MIN_PG_VERSION="${MIN_PG_VERSION_DEFAULT}"
 source "./tests/run_test_template.sh"
 
+# n1025
+CHECK_NAME="n1025"
+MIN_PG_VERSION="${MIN_PG_VERSION_DEFAULT}"
+source "./tests/run_test_template.sh"
+
+# n1026
+CHECK_NAME="n1026"
+MIN_PG_VERSION="${MIN_PG_VERSION_DEFAULT}"
+source "./tests/run_test_template.sh"
+
 # n1030
 CHECK_NAME="n1030"
 MIN_PG_VERSION="${MIN_PG_VERSION_DEFAULT}"
@@ -141,6 +157,11 @@ source "./tests/run_test_template.sh"
 
 # n1038
 CHECK_NAME="n1038"
+MIN_PG_VERSION="${MIN_PG_VERSION_DEFAULT}"
+source "./tests/run_test_template.sh"
+
+# n1040
+CHECK_NAME="n1040"
 MIN_PG_VERSION="${MIN_PG_VERSION_DEFAULT}"
 source "./tests/run_test_template.sh"
 

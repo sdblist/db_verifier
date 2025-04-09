@@ -24,11 +24,14 @@ WITH
             true  AS enable_check_n1016,     -- [notice] unwanted characters in index name
             true  AS enable_check_n1020,     -- [warning] confusion in name of sequences
             true  AS enable_check_n1021,     -- [notice] unwanted characters in sequence name
+            true  AS enable_check_n1025,     -- [warning] confusion in name of constraint
+            true  AS enable_check_n1026,     -- [notice] unwanted characters in constraint name
             true  AS enable_check_n1030,     -- [warning] constraint name reserved keyword
             true  AS enable_check_n1032,     -- [warning] index name reserved keyword
             true  AS enable_check_n1034,     -- [warning] relation name reserved keyword
             true  AS enable_check_n1036,     -- [warning] sequence name reserved keyword
             true  AS enable_check_n1038,     -- [warning] attribute name reserved keyword
+            true  AS enable_check_n1040,     -- [warning] schema name reserved keyword
             true  AS enable_check_no1001,    -- [error] check no unique key
             true  AS enable_check_no1002,    -- [error] check no primary key constraint
             true  AS enable_check_r1001,     -- [warning] unlogged table
@@ -100,15 +103,18 @@ WITH
                 ('n1016',      null, 'unwanted characters in index name', 'notice', 1, 'index'),
                 ('n1020',      null, 'confusion in name of sequences', 'warning', 1, 'sequence'),
                 ('n1021',      null, 'unwanted characters in sequence name', 'notice', 1, 'sequence'),
+                ('n1025',      null, 'confusion in name of constraint', 'warning', 1, 'constraint'),
+                ('n1026',      null, 'unwanted characters in constraint name', 'notice', 1, 'constraint'),
                 ('n1030',      null, 'constraint name reserved keyword', 'warning', 1, 'constraint'),
                 ('n1032',      null, 'index name reserved keyword', 'warning', 1, 'index'),
                 ('n1034',      null, 'relation name reserved keyword', 'warning', 1, 'relation'),
                 ('n1036',      null, 'sequence name reserved keyword', 'warning', 1, 'sequence'),
                 ('n1038',      null, 'attribute name reserved keyword', 'warning', 1, 'attribute'),
+                ('n1040',      null, 'schema name reserved keyword', 'warning', 1, 'schema'),
                 ('no1001',     null, 'no unique key', 'error', 1, 'relation'),
                 ('no1002', 'no1001', 'no primary key constraint', 'error', 1, 'relation'),
                 ('r1001',      null, 'unlogged table', 'warning', 1, 'relation'),
-                ('r1002',      null, 'relation without columns', 'warning', 1, 'relation'),
+                ('r1002',      null, 'relation without columns', 'warning', 2, 'relation'),
                 ('s1001',      null, 'unlogged sequence', 'warning', 1, 'sequence'),
                 ('s1010',      null, 'less 5% unused sequence values', 'critical', 1, 'sequence'),
                 ('s1011',   's1010', 'less 10% unused sequence values', 'error', 1, 'sequence'),
@@ -161,13 +167,17 @@ WITH
                 ('n1011',  null, 'Relation name contains unwanted characters such as dots, spaces, etc.'),
                 ('n1011',  'ru', 'Имя отношения содержит нежелательные символы, такие как точки, пробелы и др.'),
                 ('n1015',  null, 'There may be confusion in the name of the relation indexes. The names are dangerously similar.'),
-                ('n1015',  'ru', 'Возможна путаница в наименованиях индексов. Наименования опасно похожи.'),
+                ('n1015',  'ru', 'Возможна путаница в наименованиях индексов одного отношения. Наименования опасно похожи.'),
                 ('n1016',  null, 'Index name contains unwanted characters such as dots, spaces, etc.'),
                 ('n1016',  'ru', 'Имя индекса содержит нежелательные символы, такие как точки, пробелы и др.'),
                 ('n1020',  null, 'There may be confusion in the name of the sequences in the same schema. The names are dangerously similar.'),
                 ('n1020',  'ru', 'Возможна путаница в наименованиях последовательностей в одной схеме. Наименования опасно похожи.'),
                 ('n1021',  null, 'Sequence name contains unwanted characters such as dots, spaces, etc.'),
                 ('n1021',  'ru', 'Имя последовательности содержит нежелательные символы, такие как точки, пробелы и др.'),
+                ('n1025',  null, 'There may be confusion in the name of the relation constraints. The names are dangerously similar.'),
+                ('n1025',  'ru', 'Возможна путаница в наименованиях ограничений одного отношения. Наименования опасно похожи.'),
+                ('n1026',  null, 'Constraint name contains unwanted characters such as dots, spaces, etc.'),
+                ('n1026',  'ru', 'Имя ограничения содержит нежелательные символы, такие как точки, пробелы и др.'),
                 ('n1030',  null, 'Constraint name matches a reserved keyword.'),
                 ('n1030',  'ru', 'Имя ограничения совпадает с зарезервированным ключевым словом.'),
                 ('n1032',  null, 'Index name matches a reserved keyword.'),
@@ -178,6 +188,8 @@ WITH
                 ('n1036',  'ru', 'Имя последовательности совпадает с зарезервированным ключевым словом.'),
                 ('n1038',  null, 'Attribute name matches a reserved keyword.'),
                 ('n1038',  'ru', 'Имя поля совпадает с зарезервированным ключевым словом.'),
+                ('n1040',  null, 'Schema name matches a reserved keyword.'),
+                ('n1040',  'ru', 'Имя схемы совпадает с зарезервированным ключевым словом.'),
                 ('no1001', null, 'Relation has no unique key.'),
                 ('no1001', 'ru', 'У отношения нет уникального ключа (набора полей). Это может создавать проблемы при удалении записей, при логической репликации и др.'),
                 ('no1002', null, 'Relation has no primary key constraint.'),
@@ -279,6 +291,7 @@ WITH
             INNER JOIN pg_catalog.pg_type AS t ON a.atttypid = t.oid
         WHERE
             a.attnum >= 1
+            AND NOT a.attisdropped
     ),
     -- no1001 - no unique key
     check_no1001 AS (
@@ -590,7 +603,7 @@ WITH
             -- not in parent check
             AND NOT ((SELECT enable_check_fk1010 FROM conf) AND (c.oid IN (SELECT object_id FROM check_fk1010)))
     ),
-    -- filtered constraint list (minimal)
+    -- filtered constraint list
     filtered_c_list AS (
         SELECT
             c.oid,
@@ -601,7 +614,11 @@ WITH
             c.confrelid,
             c.conkey,
             c.confkey,
-            c.convalidated
+            c.convalidated,
+            regexp_replace(c.conname, (SELECT unwanted_characters FROM conf)::text, '', 'g')
+                AS constraint_name_wo_unwanted_characters,
+            lower(regexp_replace(c.conname, (SELECT unwanted_characters FROM conf)::text, '', 'g'))
+                AS constraint_name_wo_unwanted_characters_lower
         FROM pg_catalog.pg_constraint AS c
         WHERE
             c.conrelid IN (SELECT oid FROM filtered_class_list WHERE relkind IN ('r', 'm', 'p'))
@@ -1196,6 +1213,57 @@ WITH
             AND fcl.relkind IN ('S')
             AND fcl.relname <> fcl.class_name_wo_unwanted_characters
     ),
+    -- n1025 - confusion in name of constraint
+    check_n1025 AS (
+        SELECT
+            c1.oid AS object_id,
+            c1.formatted_constraint_name AS object_name,
+            ch.object_type AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', c1.oid,
+                'object_name', c1.formatted_constraint_name,
+                'object_type', ch.object_type,
+                'relation_name', t.formatted_class_full_name,
+                'constraint_type', c1.contype,
+                'similar_constraint_name', c2.formatted_constraint_name,
+                'check', ch.*
+            ) AS check_result_json
+        FROM filtered_c_list AS c1
+            INNER JOIN filtered_c_list AS c2 ON c1.oid < c2.oid AND c1.conrelid = c2.conrelid
+                AND c1.constraint_name_wo_unwanted_characters_lower = c2.constraint_name_wo_unwanted_characters_lower
+            INNER JOIN filtered_class_list AS t
+                ON t.oid = c1.conrelid
+            LEFT JOIN check_list ch ON ch.check_code = 'n1025'
+        WHERE
+            (SELECT enable_check_n1025 FROM conf)
+    ),
+    -- n1026 - unwanted characters in constraint name
+    check_n1026 AS (
+        SELECT
+            c.oid AS object_id,
+            c.formatted_constraint_name AS object_name,
+            ch.object_type AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', c.oid,
+                'object_name', c.formatted_constraint_name,
+                'object_type', ch.object_type,
+                'relation_name', t.formatted_class_full_name,
+                'constraint_type', c.contype,
+                'check', ch.*
+            ) AS check_result_json
+        FROM filtered_c_list AS c
+            INNER JOIN filtered_class_list AS t
+                ON t.oid = c.conrelid AND c.conname <> c.constraint_name_wo_unwanted_characters
+            LEFT JOIN check_list ch ON ch.check_code = 'n1026'
+        WHERE
+            (SELECT enable_check_n1026 FROM conf)
+    ),
     -- n1030 - constraint name reserved keyword
     check_n1030 AS (
         SELECT
@@ -1308,6 +1376,27 @@ WITH
         WHERE
             (SELECT enable_check_n1038 FROM conf)
             AND a.attname IN (SELECT word FROM pg_get_keywords() WHERE catcode NOT IN ('U'))
+    ),
+    -- n1040 - schema name reserved keyword
+    check_n1040 AS (
+        SELECT
+            s.oid AS object_id,
+            s.formatted_schema_name AS object_name,
+            ch.object_type AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', s.oid,
+                'object_name', s.formatted_schema_name,
+                'object_type', ch.object_type,
+                'check', ch.*
+            ) AS check_result_json
+        FROM filtered_schema_list AS s
+            LEFT JOIN check_list ch ON ch.check_code = 'n1040'
+        WHERE
+            (SELECT enable_check_n1040 FROM conf)
+            AND s.nspname IN (SELECT word FROM pg_get_keywords() WHERE catcode NOT IN ('U'))
     ),
     -- r1001 - unlogged table
     check_r1001 AS (
@@ -1422,6 +1511,10 @@ SELECT object_id, object_name, object_type, check_code, check_level, check_name,
     UNION ALL
     SELECT * FROM check_n1021  -- n1021 - unwanted characters in sequence name
     UNION ALL
+    SELECT * FROM check_n1025  -- n1025 - confusion in name of constraints
+    UNION ALL
+    SELECT * FROM check_n1026  -- n1026 - unwanted characters in constraint name
+    UNION ALL
     SELECT * FROM check_n1030  -- n1030 - constraint name reserved keyword
     UNION ALL
     SELECT * FROM check_n1032  -- n1032 - index name reserved keyword
@@ -1431,6 +1524,8 @@ SELECT object_id, object_name, object_type, check_code, check_level, check_name,
     SELECT * FROM check_n1036  -- n1036 - sequence name reserved keyword
     UNION ALL
     SELECT * FROM check_n1038  -- n1038 - attribute name reserved keyword
+    UNION ALL
+    SELECT * FROM check_n1040  -- n1040 - schema name reserved keyword
     UNION ALL
     SELECT * FROM check_no1001 -- no1001 - no unique key
     UNION ALL

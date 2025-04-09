@@ -39,11 +39,14 @@ The current version is applicable to PostgreSQL 12 and later. Tested in PostgreS
 | n1016  |             | unwanted characters in index name        | notice   | enable        | Index name contains unwanted characters such as dots, spaces, etc.                                         |
 | n1020  |             | confusion in name of sequences           | warning  | enable        | There may be confusion in the name of the sequences in the same schema. The names are dangerously similar. |
 | n1021  |             | unwanted characters in sequence name     | notice   | enable        | Sequence name contains unwanted characters such as dots, spaces, etc.                                      |
+| n1025  |             | confusion in name of constraint          | warning  | enable        | There may be confusion in the name of the relation constraints. The names are dangerously similar.         |
+| n1026  |             | unwanted characters in constraint name   | notice   | enable        | Constraint name contains unwanted characters such as dots, spaces, etc.                                    |
 | n1030  |             | constraint name reserved keyword         | warning  | enable        | Constraint name matches a reserved keyword.                                                                |
 | n1032  |             | index name reserved keyword              | warning  | enable        | Index name matches a reserved keyword.                                                                     |
 | n1034  |             | relation name reserved keyword           | warning  | enable        | Relation name matches a reserved keyword.                                                                  |
 | n1036  |             | sequence name reserved keyword           | warning  | enable        | Sequence name matches a reserved keyword.                                                                  |
 | n1038  |             | attribute name reserved keyword          | warning  | enable        | Attribute name matches a reserved keyword.                                                                 |
+| n1040  |             | schema name reserved keyword             | warning  | enable        | Schema name matches a reserved keyword.                                                                    |
 | no1001 |             | no unique key                            | error    | enable        | Relation has no unique key.                                                                                |
 | no1002 | no1001      | no primary key constraint                | error    | enable        | Relation has no primary key constraint.                                                                    |                   
 | r1001  |             | unlogged table                           | warning  | enable        | Unlogged table is not replicated, truncated after crash.                                                   |

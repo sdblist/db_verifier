@@ -15,7 +15,7 @@ SELECT
             'parent_check_code', null,
             'check_name', 'relation without columns',
             'check_level', 'warning',
-            'check_version', 1,
+            'check_version', 2,
             'object_type', 'relation',
             'check_source_name', 'system catalog'
             )
@@ -24,4 +24,5 @@ FROM pg_catalog.pg_class AS t
     INNER JOIN pg_catalog.pg_namespace AS n ON t.relnamespace = n.oid
 WHERE
     t.relkind IN ('r', 'v', 'm', 'p')
-    AND NOT EXISTS (SELECT * FROM pg_catalog.pg_attribute AS a WHERE a.attrelid = t.oid AND a.attnum >= 1)
+    AND NOT EXISTS (SELECT * FROM pg_catalog.pg_attribute AS a
+        WHERE a.attrelid = t.oid AND a.attnum >= 1 AND NOT a.attisdropped)
