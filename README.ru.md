@@ -214,6 +214,17 @@ sed -i "/^;$/d" db_verifier.sql
 sed -i "/>>> db_verifier/ r db_verifier.sql" ./examples/cumulative_score.sql
 ```
 
+Пример вызова `cumulative_score.sql` консольным клиентом `psql`.
+
+```shell
+  if [[ $(psql --file=cumulative_score.sql --quiet --no-align --tuples-only --set=ON_ERROR_STOP=on) -gt 0 ]]; then
+      echo "Error - cumulative_score.sql"
+      exit 1
+  else
+      echo "OK - cumulative_score.sql"
+  fi
+```
+
 ## Описание таблицы результатов проверки
 
 | column name       | description                                                      |
