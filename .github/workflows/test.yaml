@@ -74,7 +74,17 @@ jobs:
           POSTGRES_DB: ${{env.PGDATABASE}}
         ports:
         - 5432/tcp
-        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5        
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+
+      postgres18:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: ${{env.PGUSER}}
+          POSTGRES_PASSWORD: ${{env.PGPASSWORD}}
+          POSTGRES_DB: ${{env.PGDATABASE}}
+        ports:
+        - 5432/tcp
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
 
     steps:
       - uses: actions/checkout@v3
@@ -147,4 +157,14 @@ jobs:
           PGDATABASE: ${{env.PGDATABASE}}
           PGHOST: ${{env.PGHOST}}
           PGPORT: ${{job.services.postgres17.ports[5432]}}
+      # test postgresql-18
+      - name: Run test.sh for postgresql-18
+        run: ./tests/run_tests.sh
+        shell: bash
+        env:
+          PGUSER: ${{env.PGUSER}}
+          PGPASSWORD: ${{env.PGPASSWORD}}
+          PGDATABASE: ${{env.PGDATABASE}}
+          PGHOST: ${{env.PGHOST}}
+          PGPORT: ${{job.services.postgres18.ports[5432]}}
 

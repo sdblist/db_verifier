@@ -6,7 +6,7 @@ The script to check the database structure for errors or non-recommended practic
 The script consists of a set of checks that access the system catalog tables and do not require access to data in
 user tables.
 
-The current version is applicable to PostgreSQL 12 and later. Tested in PostgreSQL versions 12 to 17.
+The current version is applicable to PostgreSQL 12 and later. Tested in PostgreSQL versions 12 to 18.
 
 ## Project structure
 
