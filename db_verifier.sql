@@ -34,6 +34,8 @@ WITH
             true  AS enable_check_n1040,     -- [warning] schema name reserved keyword
             true  AS enable_check_no1001,    -- [error] check no unique key
             true  AS enable_check_no1002,    -- [error] check no primary key constraint
+            true  AS enable_check_pg0001,    -- [error] wrong volatility marking for json_strip_nulls and jsonb_strip_nulls
+            true  AS enable_check_pg0002,    -- [error] PUBLIC has CREATE on public schema (PG>=15)
             true  AS enable_check_r1001,     -- [warning] unlogged table
             true  AS enable_check_r1002,     -- [warning] relation without columns
             true  AS enable_check_s1001,     -- [warning] unlogged sequence
@@ -64,7 +66,9 @@ WITH
             (VALUES
                 ('attribute'),
                 ('constraint'),
+                ('function'),
                 ('index'),
+                ('privilege'),
                 ('relation'),
                 ('schema'),
                 ('sequence')
@@ -113,6 +117,8 @@ WITH
                 ('n1040',      null, 'schema name reserved keyword', 'warning', 1, 'schema'),
                 ('no1001',     null, 'no unique key', 'error', 1, 'relation'),
                 ('no1002', 'no1001', 'no primary key constraint', 'error', 1, 'relation'),
+                ('pg0001',     null, 'wrong volatility marking for json_strip_nulls and jsonb_strip_nulls', 'error', 1, 'function'),
+                ('pg0002',     null, 'PUBLIC has CREATE on public schema (PG>=15)', 'error', 1, 'privilege'),
                 ('r1001',      null, 'unlogged table', 'warning', 1, 'relation'),
                 ('r1002',      null, 'relation without columns', 'warning', 2, 'relation'),
                 ('s1001',      null, 'unlogged sequence', 'warning', 1, 'sequence'),
@@ -194,6 +200,10 @@ WITH
                 ('no1001', 'ru', 'У отношения нет уникального ключа (набора полей). Это может создавать проблемы при удалении записей, при логической репликации и др.'),
                 ('no1002', null, 'Relation has no primary key constraint.'),
                 ('no1002', 'ru', 'У отношения нет ограничения primary key.'),
+                ('pg0001', null, 'Wrong volatility marking for json_strip_nulls and jsonb_strip_nulls functions (see release notes PG 18.3).'),
+                ('pg0001', 'ru', 'Некорректное значение provolatile для функций json_strip_nulls и jsonb_strip_nulls (см. замечания к PG 18.3).'),
+                ('pg0002', null, 'PUBLIC has the CREATE privilege on the public schema (see release notes PG 15.0).'),
+                ('pg0002', 'ru', 'У роли PUBLIC не отозвано разрешение CREATE для схемы public (см. замечания к PG 15.0).'),
                 ('r1001',  null, 'Unlogged table is not replicated, truncated after crash.'),
                 ('r1001',  'ru', 'Нежурналируемая таблица не реплицируется, очищается при сбоях.'),
                 ('r1002',  null, 'Relation without columns.'),
@@ -1398,6 +1408,49 @@ WITH
             (SELECT enable_check_n1040 FROM conf)
             AND s.nspname IN (SELECT word FROM pg_get_keywords() WHERE catcode NOT IN ('U'))
     ),
+    -- pg0001 - wrong volatility marking for json_strip_nulls and jsonb_strip_nulls
+    check_pg0001 AS (
+        SELECT
+            p.oid AS object_id,
+            p.proname AS object_name,
+            ch.object_type AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', p.oid,
+                'object_name', p.proname,
+                'object_type', ch.object_type,
+                'check', ch.*
+            ) AS check_result_json
+        FROM pg_catalog.pg_proc AS p
+            LEFT JOIN check_list ch ON ch.check_code = 'pg0001'
+        WHERE
+            (SELECT enable_check_pg0001 FROM conf)
+            AND p.oid IN ('3261', '3262') AND p.provolatile <> 'i'
+    ),
+    -- pg0002 - PUBLIC has CREATE on public schema (PG>=15)
+    check_pg0002 AS (
+        SELECT
+            0 AS object_id,
+            'PUBLIC' AS object_name,
+            ch.object_type AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', 0,
+                'object_name', 'PUBLIC',
+                'object_type', ch.object_type,
+                'check', ch.*
+            ) AS check_result_json
+        FROM check_list ch
+        WHERE
+            (SELECT enable_check_pg0002 FROM conf)
+            AND ch.check_code = 'pg0002'
+            AND pg_catalog.has_schema_privilege('public', 'public', 'CREATE')
+            AND current_setting('server_version_num')::integer >= 150000
+    ),
     -- r1001 - unlogged table
     check_r1001 AS (
         SELECT
@@ -1530,6 +1583,10 @@ SELECT object_id, object_name, object_type, check_code, check_level, check_name,
     SELECT * FROM check_no1001 -- no1001 - no unique key
     UNION ALL
     SELECT * FROM check_no1002 -- no1002 - no primary key constraint
+    UNION ALL
+    SELECT * FROM check_pg0001 -- pg0001 - wrong volatility marking for json_strip_nulls and jsonb_strip_nulls
+    UNION ALL
+    SELECT * FROM check_pg0002 -- pg0002 - PUBLIC has CREATE on public schema (PG>=15)
     UNION ALL
     SELECT * FROM check_r1001  -- r1001 - unlogged table
     UNION ALL
