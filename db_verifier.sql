@@ -9,11 +9,13 @@ WITH
             false AS enable_check_fk1007,    -- [notice] not involved in foreign keys
             true  AS enable_check_fk1010,    -- [warning] similar FK
             true  AS enable_check_fk1011,    -- [warning] FK have common attributes
+            true  AS enable_check_fk1014,    -- [error] duplicate FK attributes in source relation
             true  AS enable_check_i1001,     -- [warning] similar indexes
             true  AS enable_check_i1002,     -- [error] index has bad signs
             true  AS enable_check_i1003,     -- [warning] similar indexes unique and not unique
             false AS enable_check_i1005,     -- [notice] similar indexes (roughly)
             true  AS enable_check_i1010,     -- [notice] b-tree index for array column
+            true  AS enable_check_i1012,     -- [error] duplicate columns in index
             true  AS enable_check_n1001,     -- [warning] confusion in name of schemas
             true  AS enable_check_n1002,     -- [notice] unwanted characters in schema name
             true  AS enable_check_n1005,     -- [warning] confusion in name of relation attributes
@@ -92,11 +94,13 @@ WITH
                 ('fk1007',     null, 'not involved in foreign keys', 'notice', 1, 'relation'),
                 ('fk1010',     null, 'similar FK', 'warning', 1, 'constraint'),
                 ('fk1011', 'fk1010', 'FK have common attributes', 'warning', 1, 'constraint'),
+                ('fk1014',     null, 'duplicate FK attributes in source relation', 'error', 1, 'constraint'),
                 ('i1001',      null, 'similar indexes', 'warning', 1, 'index'),
                 ('i1002',      null, 'index has bad signs', 'error', 1, 'index'),
                 ('i1003',      null, 'similar indexes unique and not unique', 'warning', 1, 'index'),
                 ('i1005',      null, 'similar indexes (roughly)', 'notice', 1, 'index'),
                 ('i1010',      null, 'b-tree index for array column', 'notice', 1, 'index'),
+                ('i1012',      null, 'duplicate columns in index', 'error', 1, 'index'),
                 ('n1001',      null, 'confusion in name of schemas', 'warning', 1, 'schema'),
                 ('n1002',      null, 'unwanted characters in schema name', 'notice', 1, 'schema'),
                 ('n1005',      null, 'confusion in name of relation attributes', 'warning', 1, 'attribute'),
@@ -150,6 +154,8 @@ WITH
                 ('fk1010', 'ru', 'FK очень похожи (возможно совпадают).'),
                 ('fk1011', null, 'There are multiple FK between relations, FK have common attributes.'),
                 ('fk1011', 'ru', 'Между отношениями несколько FK, FK имеют общие атрибуты.'),
+                ('fk1014', null, 'Duplicate FK attributes in the source relation.'),
+                ('fk1014', 'ru', 'Дублируются атрибуты внешнего ключа в исходном отношении.'),
                 ('i1001',  null, 'Indexes are very similar.'),
                 ('i1001',  'ru', 'Индексы очень похожи (возможно совпадают).'),
                 ('i1002',  null, 'Index has bad signs.'),
@@ -160,6 +166,8 @@ WITH
                 ('i1005',  'ru', 'Индексы похожи по набору полей (грубое сравнение).'),
                 ('i1010',  null, 'B-tree index for array column.'),
                 ('i1010',  'ru', 'B-tree индекс на поле с массивом значений, не индексирует элементы массива (возможно нужен GIN индекс).'),
+                ('i1012',  null, 'Duplicate columns in the index.'),
+                ('i1012',  'ru', 'В индексе дублируются колонки.'),
                 ('n1001',  null, 'There may be confusion in the name of the schemas. The names are dangerously similar.'),
                 ('n1001',  'ru', 'Возможна путаница в наименованиях схем. Наименования опасно похожи.'),
                 ('n1002',  null, 'Schema name contains unwanted characters such as dots, spaces, etc.'),
@@ -240,9 +248,7 @@ WITH
         WHERE
             (
                 -- exclude system schemas
-                nspname IN ('information_schema')
-                -- postgresql specific
-                OR nspname IN ('pg_catalog')
+                nspname IN ('information_schema', 'pg_catalog')
                 OR nspname LIKE 'pg_toast%'
             )
     ),
@@ -400,6 +406,8 @@ WITH
         FROM pg_catalog.pg_constraint AS c
         WHERE
             c.contype IN ('f')
+            -- only r (ordinary table), m (materialized view), p (partitioned table)
+            -- exclude f (foreign table) and other
             AND c.conrelid IN (SELECT oid FROM filtered_class_list WHERE relkind IN ('r', 'm', 'p'))
             AND c.confrelid IN (SELECT oid FROM filtered_class_list WHERE relkind IN ('r', 'm', 'p'))
     ),
@@ -612,6 +620,46 @@ WITH
             (SELECT enable_check_fk1011 FROM conf)
             -- not in parent check
             AND NOT ((SELECT enable_check_fk1010 FROM conf) AND (c.oid IN (SELECT object_id FROM check_fk1010)))
+    ),
+    --
+    filtered_fk_list_rel_att_name_grouped AS (
+        SELECT
+            oid,
+            formatted_constraint_name,
+            conrelid,
+            confrelid,
+            rel_att_name,
+            rel_att_formatted_name
+        FROM filtered_fk_list_attribute
+        GROUP BY 1, 2, 3, 4, 5, 6
+        HAVING count(*) > 1
+    ),
+    -- fk1014 - duplicate FK attributes in source relation
+    check_fk1014 AS (
+        SELECT
+            c.oid AS object_id,
+            c.formatted_constraint_name AS object_name,
+            ch.object_type AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', c.oid,
+                'object_name', c.formatted_constraint_name,
+                'object_type', ch.object_type,
+                'relation_name', t.formatted_class_full_name,
+                'relation_att_name', c.rel_att_formatted_name,
+                'foreign_relation_name', tf.formatted_class_full_name,
+                'check', ch.*
+            ) AS check_result_json
+        FROM filtered_fk_list_rel_att_name_grouped AS c
+            INNER JOIN filtered_class_list AS t
+                ON t.oid = c.conrelid
+            INNER JOIN filtered_class_list AS tf
+                ON tf.oid = c.confrelid
+            LEFT JOIN check_list ch ON ch.check_code = 'fk1014'
+        WHERE
+            (SELECT enable_check_fk1014 FROM conf)
     ),
     -- filtered constraint list
     filtered_c_list AS (
@@ -858,6 +906,57 @@ WITH
                         WHERE att.attrelid = i.indrelid
                             AND att.attnum = ANY ((string_to_array(indkey::text, ' ')::int2[])[1:indnkeyatts])
                             AND typ.typcategory = 'A')
+    ),
+    -- filtered index list with attribute
+    filtered_index_list_attribute AS (
+        SELECT
+            i.*,
+            k AS att_order,
+            a.attname AS att_name,
+            a.formatted_attribute_name AS att_formatted_name,
+            a.formatted_attribute_type_name2 AS att_formatted_type_name2,
+            a.atttypid AS att_type_id,
+            a.atttypmod AS att_type_mod,
+            a.attnotnull AS att_notnull
+        FROM filtered_index_list AS i
+            CROSS JOIN LATERAL generate_subscripts(i.indkey, 1) AS k
+            LEFT JOIN filtered_attribute_list AS a
+                ON a.attrelid = i.indrelid AND a.attnum = i.indkey[k]
+    ),
+    --
+    filtered_index_list_att_name_grouped AS (
+        SELECT
+            oid,
+            formatted_index_full_name,
+            indrelid,
+            att_name,
+            att_formatted_name
+        FROM filtered_index_list_attribute
+        GROUP BY 1, 2, 3, 4, 5
+        HAVING count(*) > 1
+    ),
+    -- i1012 - duplicate columns in index
+    check_i1012 AS (
+        SELECT
+            i.oid AS object_id,
+            i.formatted_index_full_name AS object_name,
+            ch.object_type AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', i.oid,
+                'object_name', i.formatted_index_full_name,
+                'object_type', ch.object_type,
+                'relation_name', t.formatted_class_full_name,
+                'att_name', i.att_formatted_name,
+                'check', ch.*
+            ) AS check_result_json
+        FROM filtered_index_list_att_name_grouped AS i
+            INNER JOIN filtered_class_list AS t ON i.indrelid = t.oid
+            LEFT JOIN check_list ch ON ch.check_code = 'i1012'
+        WHERE
+            (SELECT enable_check_i1012 FROM conf)
     ),
     --
     filtered_sequence_list AS (
@@ -1534,6 +1633,8 @@ SELECT object_id, object_name, object_type, check_code, check_level, check_name,
     UNION ALL
     SELECT * FROM check_fk1011 -- fk1011 - FK have common attributes
     UNION ALL
+    SELECT * FROM check_fk1014 -- fk1014 - duplicate FK attributes in source relation
+    UNION ALL
     SELECT * FROM check_i1001  -- i1001 - similar indexes
     UNION ALL
     SELECT * FROM check_i1002  -- i1002 - index has bad signs
@@ -1543,6 +1644,8 @@ SELECT object_id, object_name, object_type, check_code, check_level, check_name,
     SELECT * FROM check_i1005  -- i1005 - similar indexes (roughly)
     UNION ALL
     SELECT * FROM check_i1010  -- i1010 - b-tree index for array column
+    UNION ALL
+    SELECT * FROM check_i1012  -- i1012 - duplicate columns in index
     UNION ALL
     SELECT * FROM check_n1001  -- n1001 - confusion in name of schemas
     UNION ALL

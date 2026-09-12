@@ -20,6 +20,8 @@ sed -i "/AS enable_check_fk1007/s/.*/false AS enable_check_fk1007,/"  db_verifie
 sed -i "/AS enable_check_fk1010/s/.*/false AS enable_check_fk1010,/"  db_verifier.sql
 ## fk1011
 sed -i "/AS enable_check_fk1011/s/.*/false AS enable_check_fk1011,/"  db_verifier.sql
+## fk1014
+sed -i "/AS enable_check_fk1014/s/.*/false AS enable_check_fk1014,/"  db_verifier.sql
 ## i1001
 sed -i "/AS enable_check_i1001/s/.*/false AS enable_check_i1001,/"  db_verifier.sql
 ## i1002
@@ -30,6 +32,8 @@ sed -i "/AS enable_check_i1003/s/.*/false AS enable_check_i1003,/"  db_verifier.
 sed -i "/AS enable_check_i1005/s/.*/false AS enable_check_i1005,/"  db_verifier.sql
 ## i1010
 sed -i "/AS enable_check_i1010/s/.*/false AS enable_check_i1010,/"  db_verifier.sql
+## i1012
+sed -i "/AS enable_check_i1012/s/.*/false AS enable_check_i1012,/"  db_verifier.sql
 ## n1001
 sed -i "/AS enable_check_n1001/s/.*/false AS enable_check_n1001,/"  db_verifier.sql
 ## n1002
@@ -70,6 +74,10 @@ sed -i "/AS enable_check_n1040/s/.*/false AS enable_check_n1040,/"  db_verifier.
 sed -i "/AS enable_check_no1001/s/.*/false AS enable_check_no1001,/"  db_verifier.sql
 ## no1002
 sed -i "/AS enable_check_no1002/s/.*/false AS enable_check_no1002,/"  db_verifier.sql
+## pg0001
+sed -i "/AS enable_check_pg0001/s/.*/false AS enable_check_pg0001,/"  db_verifier.sql
+## pg0002
+sed -i "/AS enable_check_pg0002/s/.*/false AS enable_check_pg0002,/"  db_verifier.sql
 ## r1001
 sed -i "/AS enable_check_r1001/s/.*/false AS enable_check_r1001,/"  db_verifier.sql
 ## r1002
@@ -122,6 +130,16 @@ source "./tests/run_test_template.sh"
 
 # fk1011
 CHECK_NAME="fk1011"
+MIN_PG_VERSION="${MIN_PG_VERSION_DEFAULT}"
+source "./tests/run_test_template.sh"
+
+# fk1014
+CHECK_NAME="fk1014"
+MIN_PG_VERSION="${MIN_PG_VERSION_DEFAULT}"
+source "./tests/run_test_template.sh"
+
+# i1012
+CHECK_NAME="i1012"
 MIN_PG_VERSION="${MIN_PG_VERSION_DEFAULT}"
 source "./tests/run_test_template.sh"
 
