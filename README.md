@@ -53,6 +53,7 @@ The current version is applicable to PostgreSQL 12 and later. Tested in PostgreS
 | no1002 | no1001      | no primary key constraint                                           | error    | enable        | Relation has no primary key constraint.                                                                    |                   
 | pg0001 |             | wrong volatility marking for json_strip_nulls and jsonb_strip_nulls | error    | enable        | Wrong volatility marking for json_strip_nulls and jsonb_strip_nulls functions (see release notes PG 18.3). |
 | pg0002 |             | PUBLIC has CREATE on public schema (PG>=15)                         | error    | enable        | PUBLIC has the CREATE privilege on the public schema (see release notes PG 15.0).                          |
+| pg0003 |             | function with SECURITY DEFINER and without fixed search_path        | warning  | enable        | Function with SECURITY DEFINER and without fixed search_path.                                              |
 | r1001  |             | unlogged table                                                      | warning  | enable        | Unlogged table is not replicated, truncated after crash.                                                   |
 | r1002  |             | relation without columns                                            | warning  | enable        | Relation without columns.                                                                                  |
 | s1001  |             | unlogged sequence                                                   | warning  | enable        | Unlogged sequence is not replicated, reset after crash.                                                    |
@@ -60,6 +61,7 @@ The current version is applicable to PostgreSQL 12 and later. Tested in PostgreS
 | s1011  | s1010       | less 10% unused sequence values                                     | error    | enable        | The sequence has less than 10% unused values left.                                                         |
 | s1012  | s1011       | less 20% unused sequence values                                     | warning  | enable        | The sequence has less than 20% unused values left.                                                         |
 | sm0001 |             | invalid attribute type for uuid                                     | notice   | disable       | The field probably contains data in uuid/guid format, but a different data type is used.                   |
+| sm0002 |             | column with varchar/bpchar type and no length specified             | notice   | enable        | Column has type varchar/bpchar, but no length is specified.                                                |
 
 
 ## Usage example

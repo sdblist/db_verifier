@@ -1,7 +1,7 @@
 -- sm0001 - invalid attribute type for uuid
 
 -- sm0001 - ok
-CREATE TABLE public.sm0001_1
+CREATE UNLOGGED TABLE public.sm0001_1
 (
     uid       uuid,
     "uuid"    uuid,
@@ -16,7 +16,7 @@ CREATE TABLE public.sm0001_1
 -- sm0001 - yes - data_uid
 -- sm0001 - yes - data_guid
 -- sm0001 - yes - data_id
-CREATE TABLE public.sm0001_2
+CREATE UNLOGGED TABLE public.sm0001_2
 (
     id  varchar(32),
     data_uid  varchar(32),

@@ -38,13 +38,15 @@ WITH
             true  AS enable_check_no1002,    -- [error] check no primary key constraint
             true  AS enable_check_pg0001,    -- [error] wrong volatility marking for json_strip_nulls and jsonb_strip_nulls
             true  AS enable_check_pg0002,    -- [error] PUBLIC has CREATE on public schema (PG>=15)
+            true  AS enable_check_pg0003,    -- [warning] function with SECURITY DEFINER and without fixed search_path
             true  AS enable_check_r1001,     -- [warning] unlogged table
             true  AS enable_check_r1002,     -- [warning] relation without columns
             true  AS enable_check_s1001,     -- [warning] unlogged sequence
             true  AS enable_check_s1010,     -- [critical] less 5% unused sequence values
             true  AS enable_check_s1011,     -- [error] less 10% unused sequence values
             true  AS enable_check_s1012,     -- [warning] less 20% unused sequence values
-            false AS enable_smart_sm0001,    -- [notice] invalid attribute type for uuid
+            false AS enable_check_sm0001,    -- [notice] invalid attribute type for uuid
+            true  AS enable_check_sm0002,    -- [notice] column with varchar/bpchar type and no length specified
             --
             '[\s+.\\]' AS unwanted_characters  -- unwanted characters in object names
     ),
@@ -123,13 +125,15 @@ WITH
                 ('no1002', 'no1001', 'no primary key constraint', 'error', 1, 'relation'),
                 ('pg0001',     null, 'wrong volatility marking for json_strip_nulls and jsonb_strip_nulls', 'error', 1, 'function'),
                 ('pg0002',     null, 'PUBLIC has CREATE on public schema (PG>=15)', 'error', 1, 'privilege'),
+                ('pg0003',     null, 'function with SECURITY DEFINER and without fixed search_path', 'warning', 1, 'function'),
                 ('r1001',      null, 'unlogged table', 'warning', 1, 'relation'),
                 ('r1002',      null, 'relation without columns', 'warning', 2, 'relation'),
                 ('s1001',      null, 'unlogged sequence', 'warning', 1, 'sequence'),
                 ('s1010',      null, 'less 5% unused sequence values', 'critical', 1, 'sequence'),
                 ('s1011',   's1010', 'less 10% unused sequence values', 'error', 1, 'sequence'),
                 ('s1012',   's1011', 'less 20% unused sequence values', 'warning', 1, 'sequence'),
-                ('sm0001',     null, 'invalid attribute type for uuid', 'notice', 1, 'attribute')
+                ('sm0001',     null, 'invalid attribute type for uuid', 'notice', 1, 'attribute'),
+                ('sm0002',     null, 'column with varchar/bpchar type and no length specified', 'notice', 1, 'attribute')
             ) AS t(check_code, parent_check_code, check_name, check_level, check_version, object_type)
             INNER JOIN check_level_list AS cll ON cll.check_level = t.check_level
             INNER JOIN object_type_list AS otl ON otl.object_type = t.object_type
@@ -212,6 +216,8 @@ WITH
                 ('pg0001', 'ru', 'Некорректное значение provolatile для функций json_strip_nulls и jsonb_strip_nulls (см. замечания к PG 18.3).'),
                 ('pg0002', null, 'PUBLIC has the CREATE privilege on the public schema (see release notes PG 15.0).'),
                 ('pg0002', 'ru', 'У роли PUBLIC не отозвано разрешение CREATE для схемы public (см. замечания к PG 15.0).'),
+                ('pg0003', null, 'Function with SECURITY DEFINER and without fixed search_path.'),
+                ('pg0003', 'ru', 'У функции установлен признак SECURITY DEFINER, но не установлен search_path.'),
                 ('r1001',  null, 'Unlogged table is not replicated, truncated after crash.'),
                 ('r1001',  'ru', 'Нежурналируемая таблица не реплицируется, очищается при сбоях.'),
                 ('r1002',  null, 'Relation without columns.'),
@@ -225,7 +231,9 @@ WITH
                 ('s1012',  null, 'The sequence has less than 20% unused values left.'),
                 ('s1012',  'ru', 'У последовательности осталось менее 20% неиспользованных значений.'),
                 ('sm0001', null, 'The field probably contains data in uuid/guid format, but a different data type is used.'),
-                ('sm0001', 'ru', 'Поле, вероятно, содержит данные в формате uuid/guid, но используется другой тип данных.')
+                ('sm0001', 'ru', 'Поле, вероятно, содержит данные в формате uuid/guid, но используется другой тип данных.'),
+                ('sm0002', null, 'Column has type varchar/bpchar, but no length is specified.'),
+                ('sm0002', 'ru', 'Поле имеет тип varchar/bpchar, но размер поля не указан. Возможно лучше использовать тип text.')
             ) AS t(description_check_code, description_language_code, description_value)
         WHERE
             description_language_code IS NULL
@@ -290,14 +298,18 @@ WITH
             fcl.formatted_class_full_name,
             format('%I', t.typname) AS formatted_attribute_type_name,
             CASE
+                -- 1560 bit, 1562 varbit
                 WHEN a.atttypid IN (1560, 1562)
                     THEN concat(t.typname, '(', a.atttypmod, ')')
+                -- 1042 bpchar, 1043 varchar
                 WHEN a.atttypmod > 4 and a.atttypid IN (1042, 1043)
                     THEN concat(t.typname, '(', (a.atttypmod - 4), ')')
+                -- 1700 numeric
                 WHEN a.atttypmod >= 4 and a.atttypid IN (1700)
                     THEN concat(t.typname, '(',
                         mod((a.atttypmod >> 16), 65536), ',',
                         mod(a.atttypmod - 4, 65536), ')')
+                -- 1042 bpchar, 1043 varchar, 1700 numeric
                 WHEN a.atttypid IN (1042, 1043, 1700) THEN t.typname
                 WHEN a.atttypmod = -1 THEN format('%I', t.typname)
                 ELSE format('%I', t.typname)
@@ -308,6 +320,19 @@ WITH
         WHERE
             a.attnum >= 1
             AND NOT a.attisdropped
+    ),
+    --
+    filtered_proc_list AS (
+        SELECT
+            p.*,
+            concat(fsl.nspname, '.',  p.proname) AS proc_full_name,
+            concat(fsl.formatted_schema_name, '.',  format('%I', p.proname)) AS formatted_proc_full_name,
+            regexp_replace(p.proname, (SELECT unwanted_characters FROM conf)::text, '', 'g')
+                AS proc_name_wo_unwanted_characters,
+            lower(regexp_replace(p.proname, (SELECT unwanted_characters FROM conf)::text, '', 'g'))
+                AS proc_name_wo_unwanted_characters_lower
+        FROM pg_catalog.pg_proc AS p
+            INNER JOIN filtered_schema_list AS fsl ON p.pronamespace = fsl.oid
     ),
     -- no1001 - no unique key
     check_no1001 AS (
@@ -1550,6 +1575,30 @@ WITH
             AND pg_catalog.has_schema_privilege('public', 'public', 'CREATE')
             AND current_setting('server_version_num')::integer >= 150000
     ),
+    -- pg0003 - function with SECURITY DEFINER and without fixed search_path
+    check_pg0003 AS (
+        SELECT
+            p.oid AS object_id,
+            p.formatted_proc_full_name AS object_name,
+            ch.object_type AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', p.oid,
+                'object_name', p.formatted_proc_full_name,
+                'object_type', ch.object_type,
+                'check', ch.*
+            ) AS check_result_json
+        FROM filtered_proc_list AS p
+            LEFT JOIN check_list ch ON ch.check_code = 'pg0003'
+        WHERE
+            (SELECT enable_check_pg0003 FROM conf)
+            AND ch.check_code = 'pg0003'
+            AND NOT EXISTS (SELECT * FROM unnest(COALESCE(p.proconfig, '{}'::text[])) AS pcfg
+                WHERE pcfg LIKE 'search_path=%')
+            AND NOT EXISTS (SELECT * FROM pg_catalog.pg_depend WHERE objid = p.oid AND deptype = 'e')
+    ),
     -- r1001 - unlogged table
     check_r1001 AS (
         SELECT
@@ -1615,9 +1664,33 @@ WITH
         FROM filtered_attribute_list AS a
             LEFT JOIN check_list ch ON ch.check_code = 'sm0001'
         WHERE
-            (SELECT enable_smart_sm0001 FROM conf)
+            (SELECT enable_check_sm0001 FROM conf)
             AND (a.atttypid IN (1042, 1043) AND ((a.atttypmod - 4) IN (32, 36))
                     AND (a.attname ILIKE '%uid%' OR a.attname ILIKE '%\_id%' OR a.attname ILIKE 'id'))
+    ),
+    -- sm0002 - column with varchar/bpchar type and no length specified
+    check_sm0002 AS (
+        SELECT
+            a.attnum AS object_id,
+            a.formatted_attribute_full_name AS object_name,
+            ch.object_type AS object_type,
+            ch.check_code,
+            ch.check_level,
+            ch.check_name,
+            json_build_object(
+                'object_id', a.attnum,
+                'object_name', a.formatted_attribute_full_name,
+                'object_type', ch.object_type,
+                'attribute_type_name', a.formatted_attribute_type_name2,
+                'relation_id', a.attrelid,
+                'relation_name', a.formatted_class_full_name,
+                'check', ch.*
+            ) AS check_result_json
+        FROM filtered_attribute_list AS a
+            LEFT JOIN check_list ch ON ch.check_code = 'sm0002'
+        WHERE
+            (SELECT enable_check_sm0002 FROM conf)
+            AND a.atttypid IN (1042, 1043) AND a.atttypmod = -1
     )
 -- result
 SELECT object_id, object_name, object_type, check_code, check_level, check_name, check_result_json FROM (
@@ -1691,6 +1764,8 @@ SELECT object_id, object_name, object_type, check_code, check_level, check_name,
     UNION ALL
     SELECT * FROM check_pg0002 -- pg0002 - PUBLIC has CREATE on public schema (PG>=15)
     UNION ALL
+    SELECT * FROM check_pg0003 -- pg0003 - function with SECURITY DEFINER and without fixed search_path
+    UNION ALL
     SELECT * FROM check_r1001  -- r1001 - unlogged table
     UNION ALL
     SELECT * FROM check_r1002  -- r1002 - relation without columns
@@ -1704,6 +1779,8 @@ SELECT object_id, object_name, object_type, check_code, check_level, check_name,
     SELECT * FROM check_s1012  -- s1012 - less 20% unused sequence values
     UNION ALL
     SELECT * FROM check_sm0001 -- sm0001 - invalid attribute type for uuid
+    UNION ALL
+    SELECT * FROM check_sm0002 -- sm0002 - column with varchar/bpchar type and no length specified
 ) AS t
 -- result filter (for error suppression)
 -- >>> WHERE

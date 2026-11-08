@@ -52,6 +52,7 @@
 | no1002 | no1001      | no primary key constraint                                           | error    | enable        | У отношения нет ограничения primary key.                                                                                             |
 | pg0001 |             | wrong volatility marking for json_strip_nulls and jsonb_strip_nulls | error    | enable        | Некорректное значение provolatile для функций json_strip_nulls и jsonb_strip_nulls (см. замечания к PG 18.3).                        |
 | pg0002 |             | PUBLIC has CREATE on public schema (PG>=15)                         | error    | enable        | У роли PUBLIC не отозвано разрешение CREATE для схемы public (см. замечания к PG 15.0).                                              |
+| pg0003 |             | function with SECURITY DEFINER and without fixed search_path        | warning  | enable        | У функции установлен признак SECURITY DEFINER, но не установлен search_path.                                                         |
 | r1001  |             | unlogged table                                                      | warning  | enable        | Нежурналируемая таблица не реплицируется, очищается при сбоях.                                                                       |
 | r1002  |             | relation without columns                                            | warning  | enable        | У отношения нет атрибутов.                                                                                                           |
 | s1001  |             | unlogged sequence                                                   | warning  | enable        | Нежурналируемая последовательность не реплицируется, сбрасывается при сбоях.                                                         |
@@ -59,6 +60,7 @@
 | s1011  | s1010       | less 10% unused sequence values                                     | error    | enable        | У последовательности осталось менее 10% неиспользованных значений.                                                                   |
 | s1012  | s1011       | less 20% unused sequence values                                     | warning  | enable        | У последовательности осталось менее 20% неиспользованных значений.                                                                   |
 | sm0001 |             | invalid attribute type for uuid                                     | notice   | disable       | Поле, вероятно, содержит данные в формате uuid/guid, но используется другой тип данных.                                              |
+| sm0002 |             | column with varchar/bpchar type and no length specified             | notice   | enable        | Поле имеет тип varchar/bpchar, но размер поля не указан. Возможно лучше использовать тип text.                                       |
 
 
 

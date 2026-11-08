@@ -2,6 +2,9 @@
 
 set -e
 
+SCRIPTS_PATH="$(cd -L $(dirname ${BASH_SOURCE[0]}) &> /dev/null && pwd)"
+cd "${SCRIPTS_PATH}/../"
+
 if ! [ -f "db_verifier.sql" ]; then
   echo "Error: can not find db_verifier.sql in $(pwd)"
   exit 1
@@ -78,6 +81,8 @@ sed -i "/AS enable_check_no1002/s/.*/false AS enable_check_no1002,/"  db_verifie
 sed -i "/AS enable_check_pg0001/s/.*/false AS enable_check_pg0001,/"  db_verifier.sql
 ## pg0002
 sed -i "/AS enable_check_pg0002/s/.*/false AS enable_check_pg0002,/"  db_verifier.sql
+## pg0003
+sed -i "/AS enable_check_pg0003/s/.*/false AS enable_check_pg0003,/"  db_verifier.sql
 ## r1001
 sed -i "/AS enable_check_r1001/s/.*/false AS enable_check_r1001,/"  db_verifier.sql
 ## r1002
@@ -92,13 +97,14 @@ sed -i "/AS enable_check_s1011/s/.*/false AS enable_check_s1011,/"  db_verifier.
 sed -i "/AS enable_check_s1012/s/.*/false AS enable_check_s1012,/"  db_verifier.sql
 ## sm0001
 sed -i "/AS enable_check_sm0001/s/.*/false AS enable_check_sm0001,/"  db_verifier.sql
+## sm0002
+sed -i "/AS enable_check_sm0002/s/.*/false AS enable_check_sm0002,/"  db_verifier.sql
 
 # result to table db_verifier_result
 ## db_verifier.sql
-sed -i "/SELECT object_id, object_name, object_type, check_code, check_level, check_name, check_result_json FROM (/s/.*/SELECT object_id, object_name, object_type, check_code, check_level, check_name, check_result_json INTO UNLOGGED public.db_verifier_result FROM (/1" db_verifier.sql
+  sed -i "/SELECT object_id, object_name, object_type, check_code, check_level, check_name, check_result_json FROM (/s/.*/SELECT object_id, object_name, object_type, check_code, check_level, check_name, check_result_json INTO UNLOGGED public.db_verifier_result FROM (/1" db_verifier.sql
 
-# echo postgres server version
-echo "Server version: $(psql --command='select version();' --quiet --no-align --tuples-only --set=ON_ERROR_STOP=on)"
+echo $(su postgres --command="psql --username=postgres --command='SELECT version();' --quiet --no-align --tuples-only --set=ON_ERROR_STOP=on")
 
 # minimal postgresql server version for test running - default value
 MIN_PG_VERSION_DEFAULT="120000"
@@ -183,6 +189,11 @@ CHECK_NAME="n1040"
 MIN_PG_VERSION="${MIN_PG_VERSION_DEFAULT}"
 source "./tests/run_test_template.sh"
 
+# pg0003
+CHECK_NAME="pg0003"
+MIN_PG_VERSION="${MIN_PG_VERSION_DEFAULT}"
+source "./tests/run_test_template.sh"
+
 # r1001
 CHECK_NAME="r1001"
 MIN_PG_VERSION="${MIN_PG_VERSION_DEFAULT}"
@@ -215,5 +226,10 @@ source "./tests/run_test_template.sh"
 
 # sm0001
 CHECK_NAME="sm0001"
+MIN_PG_VERSION="${MIN_PG_VERSION_DEFAULT}"
+source "./tests/run_test_template.sh"
+
+# sm0002
+CHECK_NAME="sm0002"
 MIN_PG_VERSION="${MIN_PG_VERSION_DEFAULT}"
 source "./tests/run_test_template.sh"
