@@ -167,4 +167,13 @@ jobs:
           PGDATABASE: ${{env.PGDATABASE}}
           PGHOST: ${{env.PGHOST}}
           PGPORT: ${{job.services.postgres18.ports[5432]}}
-
+      # test postgresql-19
+      - name: Run test.sh for postgresql-19
+        run: ./tests/run_tests.sh
+        shell: bash
+        env:
+          PGUSER: ${{env.PGUSER}}
+          PGPASSWORD: ${{env.PGPASSWORD}}
+          PGDATABASE: ${{env.PGDATABASE}}
+          PGHOST: ${{env.PGHOST}}
+          PGPORT: ${{job.services.postgres19.ports[5432]}}
